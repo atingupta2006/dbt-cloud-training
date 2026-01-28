@@ -170,31 +170,6 @@ FILE_FORMAT = csv_format;
 
 ---
 
-## Part 8: Load Data
-
-```sql
-COPY INTO customers FROM @olist_stage/customers.csv;
-COPY INTO orders FROM @olist_stage/orders.csv;
-COPY INTO order_items FROM @olist_stage/order_items.csv;
-COPY INTO payments FROM @olist_stage/payments.csv;
-COPY INTO products FROM @olist_stage/products.csv;
-```
-
----
-
-## Part 9: Verify Data Load
-
-```sql
-SELECT 'customers' AS table_name, COUNT(*) AS rows FROM customers
-UNION ALL SELECT 'orders', COUNT(*) FROM orders
-UNION ALL SELECT 'order_items', COUNT(*) FROM order_items
-UNION ALL SELECT 'payments', COUNT(*) FROM payments
-UNION ALL SELECT 'products', COUNT(*) FROM products;
-```
-
-All counts should be > 0.
-
----
 
 ## Connection Credentials for Students
 
