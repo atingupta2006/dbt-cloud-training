@@ -205,7 +205,7 @@ This repository contains:
 - Options beyond DBT Cloud (Airflow, Prefect)
 
 **Hands-on:**
-- Demonstration of triggering DBT from Airflow
+- Demonstration of triggering DBT from Airflow (light)
 - Monitor jobs and set up notifications in Cloud
 
 ---
@@ -217,11 +217,11 @@ This repository contains:
 - Debug broken model chains, test failures
 - Apply fixes and rerun project
 
-### Session 20 – Evaluation Lab (2.5 Hours + 1.5 Hours MCQ + 1-on-1 Viva)
+### Session 20 – Evaluation Lab (2.5 Hours) + 1.5 Hrs of MCQ + 1 on 1 Viva
 
 **Evaluation Activities:**
 
-Learners build a DBT project from scratch, covering major topics:
+Learners build a DBT project from scratch, covering major topics from:
 
 - Setup a new project
 - Add sources, models, seeds
