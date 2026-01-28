@@ -1,6 +1,10 @@
 # Module 03 Labs - Seeds & Testing Basics
 
-All labs are instructor-led. Run commands exactly as shown.
+**Prerequisites:** Module 02 completed
+
+**Duration:** ~90 minutes
+
+**Instructor Note:** Demonstrate how seeds provide reference data and how tests validate data quality.
 
 ---
 
@@ -8,22 +12,22 @@ All labs are instructor-led. Run commands exactly as shown.
 
 Objective: Create and load product categories seed
 
-1. Move to project root
+1. Move to project root (if not already there)
 
 ```bash
-cd <your_dbt_project>
+cd ~/olist_dbt_project
 ```
 
 2. Create seeds directory
 
 ```bash
-mkdir -p seeds
+mkdir -p ~/olist_dbt_project/seeds
 ```
 
 3. Create seeds/product_categories.csv
 
 ```bash
-cat > seeds/product_categories.csv << 'EOF'
+cat > ~/olist_dbt_project/seeds/product_categories.csv << 'EOF'
 category_id,category_name,category_description
 1,books,Printed and digital books
 2,electronics,Electronic devices and accessories
@@ -36,7 +40,7 @@ EOF
 4. Inspect file
 
 ```bash
-cat seeds/product_categories.csv
+cat ~/olist_dbt_project/seeds/product_categories.csv
 ```
 
 5. Run seed
@@ -57,7 +61,7 @@ FROM product_categories;
 8. Append two more categories
 
 ```bash
-cat >> seeds/product_categories.csv << 'EOF'
+cat >> ~/olist_dbt_project/seeds/product_categories.csv << 'EOF'
 6,beauty,Beauty and personal care
 7,sports,Sports and fitness
 EOF
@@ -84,13 +88,19 @@ Success: product_categories table exists with all rows
 
 Objective: Join seed data with staging models
 
-1. Open staging products model
+1. Create staging products model
 
 ```bash
-vi models/staging/stg_products.sql
+touch ~/olist_dbt_project/models/staging/stg_products.sql
 ```
 
-2. Replace file content
+2. Open staging products model
+
+```bash
+vi ~/olist_dbt_project/models/staging/stg_products.sql
+```
+
+3. Replace file content
 
 ```sql
 WITH source_products AS (
@@ -104,7 +114,7 @@ WITH source_products AS (
         product_length_cm,
         product_height_cm,
         product_width_cm
-    FROM {{ source('olist', 'products') }}
+    FROM {{ source('olist_raw', 'products') }}
 ),
 
 categories AS (
@@ -135,13 +145,13 @@ FROM final;
 3. Create marts directory
 
 ```bash
-mkdir -p models/marts
+mkdir -p ~/olist_dbt_project/models/marts
 ```
 
 4. Create marts/products_with_categories.sql
 
 ```bash
-cat > models/marts/products_with_categories.sql << 'EOF'
+cat > ~/olist_dbt_project/models/marts/products_with_categories.sql << 'EOF'
 SELECT
     product_id,
     product_category_name,
@@ -179,7 +189,7 @@ Objective: Add tests to models using schema.yml
 1. Create staging schema file
 
 ```bash
-cat > models/staging/schema.yml << 'EOF'
+cat > ~/olist_dbt_project/models/staging/schema.yml << 'EOF'
 version: 2
 
 models:
@@ -241,13 +251,13 @@ Objective: Create singular test for business logic
 1. Create tests directory
 
 ```bash
-mkdir -p tests
+mkdir -p ~/olist_dbt_project/tests
 ```
 
 2. Create tests/assert_positive_order_totals.sql
 
 ```bash
-cat > tests/assert_positive_order_totals.sql << 'EOF'
+cat > ~/olist_dbt_project/tests/assert_positive_order_totals.sql << 'EOF'
 WITH order_totals AS (
     SELECT
         oi.order_id,
@@ -270,28 +280,6 @@ EOF
 dbt test --select assert_positive_order_totals
 ```
 
-4. Introduce failing scenario (temporary)
+### Success
 
-```bash
-vi seeds/product_categories.csv
-```
-
-5. Save file without changes and rerun test
-
-```bash
-dbt test --select assert_positive_order_totals
-```
-
-6. Restore original state
-
-```bash
-dbt seed
-```
-
-7. Rerun custom test
-
-```bash
-dbt test --select assert_positive_order_totals
-```
-
-Success: Custom test executes and validates business rule
+Custom test executes and validates business rule

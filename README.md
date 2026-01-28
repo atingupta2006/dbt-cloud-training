@@ -11,7 +11,7 @@
 This repository contains:
 
 - **docs/** - Conceptual documentation covering key DBT concepts
-- **modules/** - 11 training modules with hands-on exercises
+- **hands-on/** - 11 training modules with hands-on exercises
 - **data/raw/** - Olist e-commerce dataset for exercises
 - **references/** - Additional learning resources
 

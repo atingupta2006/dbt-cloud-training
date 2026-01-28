@@ -1,6 +1,10 @@
 # Module 01 Labs – DBT Setup & Project Structure
 
-All labs are demonstrated by instructor. Students follow the same commands.
+**Prerequisites:** Module 00 completed
+
+**Duration:** ~90 minutes
+
+**Instructor Note:** Demonstrate each lab while students follow along using the same commands.
 
 ---
 
@@ -18,11 +22,11 @@ Objective: Install dbt 1.9.8 inside Python virtual environment
 ### Steps
 
 ```bash
-python3 -m venv .venv
+python3 -m venv ~/.venv
 ```
 
 ```bash
-source .venv/bin/activate
+source ~/.venv/bin/activate
 ```
 
 ```bash
@@ -73,7 +77,7 @@ nano ~/.dbt/profiles.yml
 Paste:
 
 ```yaml
-my_project:
+olist_dbt_project:
   target: dev
   outputs:
     dev:
@@ -92,10 +96,10 @@ Set variables (replace values):
 
 ```bash
 export SNOWFLAKE_ACCOUNT="account_name"
-export SNOWFLAKE_USER="username"
-export SNOWFLAKE_PASSWORD="password"
-export SNOWFLAKE_ROLE="role_name"
-export SNOWFLAKE_DATABASE="database_name"
+export SNOWFLAKE_USER="DBT_USER"
+export SNOWFLAKE_PASSWORD="StrongPassword@123"
+export SNOWFLAKE_ROLE="DBT_ROLE"
+export SNOWFLAKE_DATABASE="OLIST_DB"
 export SNOWFLAKE_WAREHOUSE="warehouse_name"
 export SNOWFLAKE_SCHEMA="analytics"
 ```
@@ -129,13 +133,13 @@ Objective: Create dbt project and run example models
 ### Steps
 
 ```bash
-dbt init my_project
+dbt init olist_dbt_project
 ```
 
-Select profile: `my_project`
+Select profile: `olist_dbt_project`
 
 ```bash
-cd my_project
+cd ~/olist_dbt_project
 ```
 
 ```bash
@@ -168,14 +172,14 @@ Objective: Set default materializations
 ### Steps
 
 ```bash
-nano dbt_project.yml
+nano ~/olist_dbt_project/dbt_project.yml
 ```
 
 Replace models section with:
 
 ```yaml
 models:
-  my_project:
+  olist_dbt_project:
     staging:
       +materialized: view
     marts:
@@ -206,36 +210,31 @@ Objective: Create staging and marts folders and first model
 ### Steps
 
 ```bash
-mkdir -p models/staging
-mkdir -p models/marts
+mkdir -p ~/olist_dbt_project/models/staging
+mkdir -p ~/olist_dbt_project/models/marts
 ```
 
 ```bash
-rm -rf models/example
+rm -rf ~/olist_dbt_project/models/example
 ```
 
 Create staging model:
 
 ```bash
-nano models/staging/stg_customers.sql
+nano ~/olist_dbt_project/models/staging/stg_customers.sql
 ```
 
 Paste:
 
 ```sql
-WITH source AS (
-    SELECT
-        customer_id,
-        customer_city,
-        customer_state
-    FROM {{ source('raw', 'customers') }}
-)
 SELECT
     customer_id,
     customer_city,
     customer_state
-FROM source
+FROM OLIST_DB.RAW.customers
 ```
+
+**Note:** In Module 02, we'll learn to use the `source()` function instead of hardcoding table references.
 
 ```bash
 dbt run --select staging

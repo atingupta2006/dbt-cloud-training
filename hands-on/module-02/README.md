@@ -1,5 +1,11 @@
 # Module 02 Labs — Building Models & Sources
 
+**Prerequisites:** Module 01 completed
+
+**Duration:** ~80 minutes
+
+**Instructor Note:** Walk through each lab step-by-step. Ensure students create all staging models before proceeding to marts.
+
 ---
 
 ## Lab 1 — Staging Models with ref() (25 min)
@@ -11,18 +17,44 @@
 1. Create staging directory
 
 ```bash
-mkdir -p models/staging
+mkdir -p ~/olist_dbt_project/models/staging
 ```
 
-2. Create staging models
+2. Create sources.yml file
 
 ```bash
-touch models/staging/stg_customers.sql
-touch models/staging/stg_orders.sql
-touch models/staging/stg_order_items.sql
+cat > ~/olist_dbt_project/models/staging/sources.yml << 'EOF'
+version: 2
+
+sources:
+  - name: olist_raw
+    schema: RAW
+    tables:
+      - name: customers
+        identifier: customers
+      - name: orders
+        identifier: orders
+      - name: order_items
+        identifier: order_items
+      - name: products
+        identifier: products
+      - name: payments
+        identifier: payments
+EOF
 ```
 
-3. Edit stg_customers.sql
+**Note:** The database name (OLIST_DB) is inherited from your `profiles.yml` configuration.
+
+3. Create staging models
+
+```bash
+touch ~/olist_dbt_project/models/staging/stg_customers.sql
+touch ~/olist_dbt_project/models/staging/stg_orders.sql
+touch ~/olist_dbt_project/models/staging/stg_order_items.sql
+touch ~/olist_dbt_project/models/staging/stg_payments.sql
+```
+
+4. Edit stg_customers.sql
 
 ```sql
 SELECT
@@ -30,10 +62,10 @@ SELECT
     customer_unique_id,
     customer_city,
     customer_state
-FROM RAW.customers
+FROM {{ source('olist_raw', 'customers') }}
 ```
 
-4. Edit stg_orders.sql
+5. Edit stg_orders.sql
 
 ```sql
 SELECT
@@ -41,10 +73,10 @@ SELECT
     customer_id,
     order_status,
     order_purchase_timestamp
-FROM RAW.orders
+FROM {{ source('olist_raw', 'orders') }}
 ```
 
-5. Edit stg_order_items.sql
+6. Edit stg_order_items.sql
 
 ```sql
 SELECT
@@ -52,22 +84,34 @@ SELECT
     product_id,
     price,
     freight_value
-FROM RAW.order_items
+FROM {{ source('olist_raw', 'order_items') }}
 ```
 
-6. Create marts directory
+7. Edit stg_payments.sql
+
+```sql
+SELECT
+    order_id,
+    payment_sequential,
+    payment_type,
+    payment_installments,
+    payment_value
+FROM {{ source('olist_raw', 'payments') }}
+```
+
+8. Create marts directory
 
 ```bash
-mkdir -p models/marts
+mkdir -p ~/olist_dbt_project/models/marts
 ```
 
-7. Create downstream model
+9. Create downstream model
 
 ```bash
-touch models/marts/fct_orders.sql
+touch ~/olist_dbt_project/models/marts/fct_orders.sql
 ```
 
-8. Edit fct_orders.sql
+10. Edit fct_orders.sql
 
 ```sql
 WITH orders AS (
@@ -94,7 +138,7 @@ LEFT JOIN customers c
     ON o.customer_id = c.customer_id
 ```
 
-9. Run models
+11. Run models
 
 ```bash
 dbt run
@@ -115,7 +159,7 @@ Logs show staging models run before fct_orders
 1. Create model
 
 ```bash
-touch models/marts/fct_sales.sql
+touch ~/olist_dbt_project/models/marts/fct_sales.sql
 ```
 
 2. Edit fct_sales.sql
@@ -142,7 +186,8 @@ items AS (
         order_id,
         product_id,
         price,
-        freight_value
+        freight_value,
+        CONCAT(order_id, '-', product_id) AS order_item_id
     FROM {{ ref('stg_order_items') }}
 
 ),
@@ -150,6 +195,7 @@ items AS (
 joined AS (
 
     SELECT
+        CONCAT(o.order_id, '-', i.product_id) AS order_item_id,
         o.order_id,
         i.product_id,
         o.customer_id,
@@ -198,36 +244,65 @@ Second run processes fewer rows than first
 
 ---
 
-## Lab 3 — Declare Sources in YAML (20 min)
+## Lab 3 — Source Freshness Configuration (20 min)
 
-**Objective**: Configure sources and switch staging models to source().
+**Objective**: Add freshness checks to existing sources.
 
 ### Tasks
 
-1. Create file
+1. Edit ~/olist_dbt_project/models/staging/sources.yml
 
 ```bash
-touch models/staging/sources.yml
+nano ~/olist_dbt_project/models/staging/sources.yml
 ```
 
-2. Edit sources.yml
+2. Replace entire file with freshness configuration:
 
 ```yaml
 version: 2
 
 sources:
   - name: olist_raw
-    database: TRAINING_DB
     schema: RAW
     tables:
       - name: customers
+        identifier: customers
+        loaded_at_field: customer_id
       - name: orders
+        identifier: orders
+        loaded_at_field: order_purchase_timestamp
       - name: order_items
+        identifier: order_items
+        loaded_at_field: order_id
       - name: products
+        identifier: products
       - name: payments
+        identifier: payments
 ```
 
-3. Update stg_customers.sql
+3. Run staging models
+
+```bash
+dbt run --select staging
+```
+
+4. Inspect compiled SQL
+
+```bash
+ls ~/olist_dbt_project/target/compiled
+```
+
+### Success
+
+Compiled SQL shows source() resolved correctly
+
+3. Update stg_customers.sql to use source function
+
+```bash
+nano ~/olist_dbt_project/models/staging/stg_customers.sql
+```
+
+Replace FROM clause with:
 
 ```sql
 FROM {{ source('olist_raw','customers') }}
@@ -235,23 +310,35 @@ FROM {{ source('olist_raw','customers') }}
 
 4. Update stg_orders.sql
 
+```bash
+nano ~/olist_dbt_project/models/staging/stg_orders.sql
+```
+
+Replace FROM clause with:
+
 ```sql
 FROM {{ source('olist_raw','orders') }}
 ```
 
 5. Update stg_order_items.sql
 
+```bash
+nano ~/olist_dbt_project/models/staging/stg_order_items.sql
+```
+
+Replace FROM clause with:
+
 ```sql
 FROM {{ source('olist_raw','order_items') }}
 ```
 
-6. Run staging only
+3. Run staging only
 
 ```bash
 dbt run --select staging
 ```
 
-7. Inspect compiled SQL
+4. Inspect compiled SQL
 
 ```bash
 ls target/compiled
@@ -269,12 +356,19 @@ Compiled SQL shows source() resolved
 
 ### Tasks
 
-1. Edit models/staging/sources.yml
+1. Edit ~/olist_dbt_project/models/staging/sources.yml
+
+```bash
+nano ~/olist_dbt_project/models/staging/sources.yml
+```
+
+Replace content with:
 
 ```yaml
+version: 2
+
 sources:
   - name: olist_raw
-    database: TRAINING_DB
     schema: RAW
     freshness:
       warn_after:
@@ -285,10 +379,13 @@ sources:
         period: hour
     tables:
       - name: orders
+        identifier: orders
         loaded_at_field: order_purchase_timestamp
       - name: customers
+        identifier: customers
         loaded_at_field: customer_id
       - name: order_items
+        identifier: order_items
         loaded_at_field: order_id
 ```
 
