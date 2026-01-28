@@ -57,16 +57,43 @@ Plugins:
 
 ---
 
-## Lab 2: Configure Snowflake Connection (25 min)
+## Lab 2: Initialize Project (20 min)
 
-Objective: Create profiles.yml with Snowflake connection
+Objective: Create dbt project
 
 ### Tasks
 
-1. Open profiles.yml
-2. Paste Snowflake profile
-3. Set environment variables
-4. Run dbt debug
+1. Initialize project
+2. Enter project directory
+
+### Steps
+
+```bash
+dbt init olist_dbt_project
+```
+
+Select profile: `olist_dbt_project`
+
+```bash
+cd ~/olist_dbt_project
+```
+
+### Success
+
+* Project created at ~/olist_dbt_project
+* profiles.yml created at ~/.dbt/profiles.yml
+
+---
+
+## Lab 3: Configure Snowflake Connection (25 min)
+
+Objective: Configure profiles.yml with Snowflake connection
+
+### Tasks
+
+1. Edit profiles.yml
+2. Set environment variables
+3. Run dbt debug
 
 ### Steps
 
@@ -74,7 +101,7 @@ Objective: Create profiles.yml with Snowflake connection
 nano ~/.dbt/profiles.yml
 ```
 
-Paste:
+Replace entire file with:
 
 ```yaml
 olist_dbt_project:
@@ -117,30 +144,19 @@ Connection test: OK connection ok
 ### Success
 
 * All checks pass
+* Connection to Snowflake verified
 
 ---
 
-## Lab 3: Initialize Project (20 min)
+## Lab 4: Run Example Models (15 min)
 
-Objective: Create dbt project and run example models
+Objective: Run dbt example models to verify setup
 
 ### Tasks
 
-1. Initialize project
-2. Enter project directory
-3. Run dbt run
+1. Run example models
 
 ### Steps
-
-```bash
-dbt init olist_dbt_project
-```
-
-Select profile: `olist_dbt_project`
-
-```bash
-cd ~/olist_dbt_project
-```
 
 ```bash
 dbt run
@@ -154,11 +170,11 @@ Completed successfully
 
 ### Success
 
-* Example models build
+* Example models build successfully
 
 ---
 
-## Lab 4: Configure dbt_project.yml (25 min)
+## Lab 5: Configure dbt_project.yml (25 min)
 
 Objective: Set default materializations
 
@@ -167,7 +183,6 @@ Objective: Set default materializations
 1. Open dbt_project.yml
 2. Set staging as views
 3. Set marts as tables
-4. Run dbt run
 
 ### Steps
 
@@ -186,17 +201,13 @@ models:
       +materialized: table
 ```
 
-```bash
-dbt run
-```
-
 ### Success
 
-* Build completes
+* Configuration updated
 
 ---
 
-## Lab 5: Organize Folder Structure (30 min)
+## Lab 6: Organize Folder Structure (30 min)
 
 Objective: Create staging and marts folders and first model
 
