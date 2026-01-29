@@ -158,19 +158,73 @@ unique_key: ['order_id','product_id']
 
 ---
 
-## Append vs Upsert
+## Append vs Merge Strategies
 
-**Append** - Only inserts new rows:
+### Append Strategy
+
+**Inserts new rows only. Never updates existing rows.**
+
 ```sql
-incremental_strategy='append'
+{{ config(
+    materialized='incremental',
+    incremental_strategy='append'
+) }}
+
+SELECT
+    order_id,
+    customer_id,
+    order_purchase_timestamp
+FROM {{ ref('stg_orders') }}
+
+{% if is_incremental() %}
+WHERE order_purchase_timestamp > (SELECT MAX(order_purchase_timestamp) FROM {{ this }})
+{% endif %}
 ```
 
-**Upsert (Merge)** - Updates existing rows, inserts new:
+**Use when:** Data never changes (transactions, events)
+
+---
+
+### Merge Strategy
+
+**Updates existing rows if key matches, inserts new rows.**
+
 ```sql
-incremental_strategy='merge', unique_key='order_id'
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='order_id'
+) }}
+
+SELECT
+    order_id,
+    customer_id,
+    order_status
+FROM {{ ref('stg_orders') }}
+
+{% if is_incremental() %}
+WHERE order_purchase_timestamp >= CURRENT_TIMESTAMP - INTERVAL '7 DAYS'
+{% endif %}
 ```
 
-Use merge when rows can change over time.
+**Use when:** Rows can change (order status updates, dimension changes)
+
+**Lookback window:** Filters last N days to catch late updates
+
+---
+
+### Comparison
+
+| Strategy | SQL Command | Updates? | Use Case           |
+| -------- | ----------- | -------- | ------------------ |
+| append   | INSERT      | No       | Immutable events   |
+| merge    | MERGE       | Yes      | Changing data      |
+
+**Example:** Order changes from "pending" to "delivered"
+- Append → creates duplicate rows ❌
+- Merge → updates existing row ✓
+
+---
 
 ---
 
