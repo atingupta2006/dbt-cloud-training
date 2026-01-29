@@ -386,12 +386,12 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.fct_sales;
 
 ### Success
 
-✅ All 6 models run successfully (4 staging views + 2 marts)
-✅ Staging models created as views
-✅ fct_orders created as table
-✅ fct_sales created as incremental table
-✅ Freshness checks complete
-✅ DAG executes in correct order (staging before marts)
+ - ✅ All 6 models run successfully (4 staging views + 2 marts)
+ - ✅ Staging models created as views
+ - ✅ fct_orders created as table
+ - ✅ fct_sales created as incremental table
+ - ✅ Freshness checks complete
+ - ✅ DAG executes in correct order (staging before marts)
 
 ---
 
