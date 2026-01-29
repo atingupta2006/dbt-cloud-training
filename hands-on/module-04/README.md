@@ -2,366 +2,395 @@
 
 **Prerequisites:** Module 03 completed
 
-**Duration:** ~120 minutes
+**Duration:** ~90 minutes
 
-**Instructor Note:** This module introduces snapshots for slowly changing dimensions and builds a complete integration pipeline.
+**Instructor Note:** This module introduces snapshots for slowly changing dimensions (SCD Type 2) and demonstrates full pipeline integration testing.
 
 ---
 
-## Lab 1: Create Customer Snapshot (30 min)
+## Lab 1: Create Customer Snapshot (45 min)
 
-Objective: Track customer record changes over time
+**Objective:** Track customer dimension changes over time using SCD Type 2
+
+### Overview
+
+Snapshots in dbt capture historical changes to dimension tables. We'll use the **check strategy** to monitor specific columns for changes.
 
 ### Tasks
 
-1. Create snapshots directory
-
-```bash
-mkdir -p ~/olist_dbt_project/snapshots
-```
-
-2. Create snapshot file
-
-```bash
-touch ~/olist_dbt_project/snapshots/customers_snapshot.sql
-```
-
-3. Add snapshot (timestamp strategy using derived updated_at)
+#### 1. Create `~/olist_dbt_project/snapshots/customers_snapshot.sql` in VSCode:
 
 ```sql
 {% snapshot customers_snapshot %}
 
 {{
     config(
-        target_schema='snapshots',
-        unique_key='customer_id',
-        strategy='timestamp',
-        updated_at='updated_at'
+      target_schema='SNAPSHOTS',
+      unique_key='customer_id',
+      strategy='check',
+      check_cols=['customer_city', 'customer_state', 'customer_zip_code_prefix']
     )
 }}
 
-WITH customers AS (
-    SELECT
-        customer_id,
-        customer_unique_id,
-        customer_city,
-        customer_state
-    FROM {{ source('olist_raw', 'customers') }}
-),
-
-orders AS (
-    SELECT
-        customer_id,
-        MAX(order_purchase_timestamp) AS updated_at
-    FROM {{ source('olist_raw', 'orders') }}
-    GROUP BY customer_id
-)
-
-SELECT
-    c.customer_id,
-    c.customer_unique_id,
-    c.customer_city,
-    c.customer_state,
-    o.updated_at
-FROM customers c
-LEFT JOIN orders o
-    ON c.customer_id = o.customer_id
+SELECT *
+FROM {{ source('olist_raw', 'customers') }}
 
 {% endsnapshot %}
 ```
 
-4. Run snapshot
+**Configuration explained:**
+- `target_schema='SNAPSHOTS'`: Where snapshot table will be created
+- `unique_key='customer_id'`: Primary key for tracking records
+- `strategy='check'`: Monitor specific columns for changes
+- `check_cols=[...]`: Columns to monitor - snapshot triggers when these change
+
+#### 4. Run initial snapshot (baseline)
 
 ```bash
 dbt snapshot
 ```
 
-5. Update one customer record in raw table
+**Expected output:**
+```
+Completed successfully
+Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1
+```
+
+This creates the snapshot table with all current customer records and adds these dbt columns:
+- `dbt_valid_from`: When this version became active
+- `dbt_valid_to`: When this version expired (NULL = current)
+- `dbt_scd_id`: Unique identifier for this version
+
+#### 5. Verify initial snapshot
+
+Query in Snowflake:
+
+```sql
+-- Check row count
+SELECT COUNT(*) FROM OLIST_DB.SNAPSHOTS.customers_snapshot;
+
+-- View sample records
+SELECT 
+    customer_id,
+    customer_city,
+    customer_state,
+    dbt_valid_from,
+    dbt_valid_to
+FROM OLIST_DB.SNAPSHOTS.customers_snapshot
+LIMIT 10;
+```
+
+**Expected:** All records have `dbt_valid_to = NULL` (all current)
+
+#### 6. Update a customer record
+
+In Snowflake, update one customer to test change tracking:
 
 ```sql
 UPDATE OLIST_DB.RAW.customers
-SET customer_city = 'test_city'
+SET customer_city = 'SNAPSHOT_TEST_CITY_XYZ',
+    customer_state = 'ZZ'
 WHERE customer_id = (
-    SELECT customer_id FROM OLIST_DB.RAW.customers LIMIT 1
+    SELECT customer_id 
+    FROM OLIST_DB.RAW.customers 
+    LIMIT 1
 );
 ```
 
-6. Run snapshot again
+Verify the update:
+
+```sql
+SELECT customer_id, customer_city, customer_state
+FROM OLIST_DB.RAW.customers 
+WHERE customer_city = 'SNAPSHOT_TEST_CITY_XYZ';
+```
+
+**Expected:** 1 row with updated city and state
+
+#### 7. Run snapshot again to capture change
 
 ```bash
 dbt snapshot
 ```
 
-7. Query snapshot table
+**Expected output:**
+```
+Completed successfully
+Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1
+```
+
+#### 8. Query snapshot to see SCD Type 2 history
 
 ```sql
-SELECT
+SELECT 
     customer_id,
     customer_city,
+    customer_state,
     dbt_valid_from,
-    dbt_valid_to
-FROM snapshots.customers_snapshot
+    dbt_valid_to,
+    dbt_scd_id
+FROM OLIST_DB.SNAPSHOTS.customers_snapshot
+WHERE customer_city = 'SNAPSHOT_TEST_CITY_XYZ' 
+   OR customer_id = (
+       SELECT customer_id 
+       FROM OLIST_DB.RAW.customers 
+       WHERE customer_city = 'SNAPSHOT_TEST_CITY_XYZ'
+   )
 ORDER BY customer_id, dbt_valid_from;
 ```
 
-Success: Snapshot table shows multiple versions for same customer_id
+**Expected:** 2 rows for the same customer_id
+- **Row 1 (Old version):** Original city/state, `dbt_valid_to` = timestamp (expired)
+- **Row 2 (New version):** Updated city/state, `dbt_valid_to` = NULL (current)
+
+### Success Criteria
+
+✅ Snapshot table exists in SNAPSHOTS schema
+✅ Initial snapshot contains all customer records
+✅ After update, snapshot shows 2 versions for modified customer
+✅ Old version has `dbt_valid_to` timestamp
+✅ New version has `dbt_valid_to` = NULL
 
 ---
 
-## Lab 2: Integration Project (90 min)
+## Lab 2: Integration Testing (45 min)
 
-Objective: Build complete end-to-end pipeline
+**Objective:** Test the complete end-to-end pipeline built across Modules 01-04
 
-Pipeline Architecture
+### Overview
+
+The `dbt build` command runs everything in dependency order:
+1. Seeds (CSV files)
+2. Models (staging → marts)
+3. Snapshots
+4. Tests
+
+### Current Project Architecture
+
+From Modules 01-03, you have:
 
 ```
-sources (5 raw tables)
+OLIST_DB.RAW (source)
     ↓
-staging (5 views)
+Seeds (product_categories.csv)
     ↓
-intermediate (2 ephemeral)
+Staging Models (5 views)
+├── stg_customers
+├── stg_orders  
+├── stg_order_items
+├── stg_payments
+└── stg_products
     ↓
-marts (3 tables)
+Mart Models (3 models)
+├── fct_orders (table)
+├── fct_sales (incremental table)
+└── products_with_categories (view)
+    ↓
+Snapshots (1 snapshot)
+└── customers_snapshot (SCD Type 2)
+    ↓
+Tests (9 tests + 1 custom test)
 ```
-
----
 
 ### Tasks
 
-1. Declare sources
+#### 1. Review the full pipeline
+
+Check your project structure:
 
 ```bash
-touch ~/olist_dbt_project/models/sources.yml
+# View all models
+ls models/staging/
+ls models/marts/
+
+# View seeds
+ls seeds/
+
+# View snapshots
+ls snapshots/
+
+# View tests
+ls tests/
 ```
 
-```yaml
-version: 2
+#### 2. Run complete integration test
 
-sources:
-  - name: olist_raw
-    schema: RAW
-    tables:
-      - name: customers
-        identifier: customers
-      - name: orders
-        identifier: orders
-      - name: order_items
-        identifier: order_items
-      - name: products
-        identifier: products
-      - name: payments
-        identifier: payments
-```
-
-2. Create staging models
-
-```bash
-mkdir -p ~/olist_dbt_project/models/staging
-```
-
-```bash
-touch ~/olist_dbt_project/models/staging/stg_customers.sql
-```
-
-```sql
-SELECT
-    customer_id,
-    customer_unique_id,
-    customer_city,
-    customer_state
-FROM {{ source('olist_raw', 'customers') }}
-```
-
-```bash
-touch ~/olist_dbt_project/models/staging/stg_orders.sql
-```
-
-```sql
-SELECT
-    order_id,
-    customer_id,
-    order_status,
-    order_purchase_timestamp
-FROM {{ source('olist_raw', 'orders') }}
-```
-
-```bash
-touch ~/olist_dbt_project/models/staging/stg_order_items.sql
-```
-
-```sql
-SELECT
-    order_id,
-    order_item_id,
-    product_id,
-    seller_id,
-    price,
-    freight_value
-FROM {{ source('olist_raw', 'order_items') }}
-```
-
-```bash
-touch ~/olist_dbt_project/models/staging/stg_products.sql
-```
-
-```sql
-SELECT
-    product_id,
-    product_category_name
-FROM {{ source('olist_raw', 'products') }}
-```
-
-```bash
-touch ~/olist_dbt_project/models/staging/stg_payments.sql
-```
-
-```sql
-SELECT
-    order_id,
-    payment_type,
-    payment_value
-FROM {{ source('olist_raw', 'payments') }}
-```
-
-3. Add staging tests
-
-```bash
-touch ~/olist_dbt_project/models/staging/schema.yml
-```
-
-```yaml
-version: 2
-
-models:
-  - name: stg_customers
-    columns:
-      - name: customer_id
-        tests: [not_null, unique]
-
-  - name: stg_orders
-    columns:
-      - name: order_id
-        tests: [not_null, unique]
-```
-
-4. Create intermediate models
-
-```bash
-mkdir -p ~/olist_dbt_project/models/intermediate
-```
-
-```bash
-touch ~/olist_dbt_project/models/intermediate/int_orders_enriched.sql
-```
-
-```sql
-{{ config(materialized='ephemeral') }}
-
-SELECT
-    o.order_id,
-    o.customer_id,
-    o.order_status,
-    o.order_purchase_timestamp,
-    p.payment_type,
-    p.payment_value
-FROM {{ ref('stg_orders') }} o
-LEFT JOIN {{ ref('stg_payments') }} p
-    ON o.order_id = p.order_id
-```
-
-```bash
-touch ~/olist_dbt_project/models/intermediate/int_customer_metrics.sql
-```
-
-```sql
-{{ config(materialized='ephemeral') }}
-
-SELECT
-    customer_id,
-    COUNT(order_id) AS total_orders
-FROM {{ ref('stg_orders') }}
-GROUP BY customer_id
-```
-
-5. Create marts
-
-```bash
-mkdir -p ~/olist_dbt_project/models/marts
-```
-
-```bash
-touch ~/olist_dbt_project/models/marts/dim_customers.sql
-```
-
-```sql
-SELECT
-    c.customer_id,
-    c.customer_unique_id,
-    c.customer_city,
-    c.customer_state,
-    m.total_orders
-FROM {{ ref('stg_customers') }} c
-LEFT JOIN {{ ref('int_customer_metrics') }} m
-    ON c.customer_id = m.customer_id
-```
-
-```bash
-touch ~/olist_dbt_project/models/marts/dim_products.sql
-```
-
-```sql
-SELECT
-    product_id,
-    product_category_name
-FROM {{ ref('stg_products') }}
-```
-
-```bash
-touch ~/olist_dbt_project/models/marts/fct_sales.sql
-```
-
-```sql
-{{ config(materialized='incremental', unique_key='order_item_id') }}
-
-SELECT
-    CONCAT(oi.order_id, '-', oi.product_id) AS order_item_id,
-    oi.order_id,
-    oi.order_item_id AS original_order_item_id,
-    oi.product_id,
-    oi.price,
-    oi.freight_value
-FROM {{ ref('stg_order_items') }} oi
-```
-
-6. Add mart tests
-
-```bash
-touch ~/olist_dbt_project/models/marts/schema.yml
-```
-
-```yaml
-version: 2
-
-models:
-  - name: dim_customers
-    columns:
-      - name: customer_id
-        tests: [not_null, unique]
-
-  - name: fct_sales
-    columns:
-      - name: order_id
-        tests: [not_null]
-```
-
-7. Create snapshot for dim_customers
-
-Reuse customers_snapshot.sql
-
-8. Run full pipeline
+Execute the full pipeline:
 
 ```bash
 dbt build
 ```
 
-Success: All models run, tests pass, snapshot exists
+**Expected output:**
+```
+Running with dbt=1.9.2
+Found 9 models, 9 tests, 1 seed, 1 snapshot, 5 sources
+
+Concurrency: 4 threads
+
+14:30:00  1 of 20 START seed file OLIST_DB.RAW.product_categories ............. [RUN]
+14:30:01  1 of 20 OK loaded seed file OLIST_DB.RAW.product_categories .......... [INSERT 7 in 1.2s]
+14:30:01  2 of 20 START sql view model OLIST_DB.ANALYTICS.stg_customers ........ [RUN]
+14:30:01  3 of 20 START sql view model OLIST_DB.ANALYTICS.stg_orders ........... [RUN]
+...
+14:30:15  20 of 20 PASS test assert_positive_order_totals ...................... [PASS in 0.5s]
+
+Finished running 5 view models, 3 table models, 9 tests, 1 seed, 1 snapshot in 15.2s
+
+Completed with 1 warning:
+
+Warning in test accepted_values_stg_orders_order_status__delivered__shipped__canceled__processing (models/staging/schema.yml)
+  Got 1 result, configured to warn if != 0
+
+Done. PASS=19 WARN=1 ERROR=0 SKIP=0 TOTAL=20
+```
+
+**Note:** The 1 warning is intentional (from Module 03) - it's a teaching example of test failures.
+
+#### 3. Verify objects in Snowflake
+
+Check each schema:
+
+```sql
+-- RAW schema (source + seeds)
+SHOW TABLES IN SCHEMA OLIST_DB.RAW;
+
+-- ANALYTICS schema (models)
+SHOW VIEWS IN SCHEMA OLIST_DB.ANALYTICS;
+SHOW TABLES IN SCHEMA OLIST_DB.ANALYTICS;
+
+-- SNAPSHOTS schema
+SHOW TABLES IN SCHEMA OLIST_DB.SNAPSHOTS;
+```
+
+**Expected objects:**
+
+**RAW:**
+- customers (source table)
+- orders (source table)
+- order_items (source table)
+- payments (source table)
+- products (source table)
+- product_categories (seed)
+
+**ANALYTICS:**
+- Views: stg_customers, stg_orders, stg_order_items, stg_payments, stg_products
+- Tables: fct_orders, fct_sales
+- View: products_with_categories
+
+**SNAPSHOTS:**
+- Table: customers_snapshot
+
+#### 4. Test selection syntax (preview of Module 05)
+
+Run specific parts of the pipeline:
+
+```bash
+# Run only staging models
+dbt build --select staging.*
+
+# Run a specific model and its downstream dependencies
+dbt build --select stg_customers+
+
+# Run only marts
+dbt build --select marts.*
+
+# Run only tests
+dbt test
+
+# Run tests for specific model
+dbt test --select stg_orders
+```
+
+#### 5. View lineage graph
+
+Generate documentation:
+
+```bash
+dbt docs generate
+dbt docs serve
+```
+
+Navigate to the lineage graph and explore:
+- Source → staging → mart dependencies
+- Model details
+- Test results
+
+### Success Criteria
+
+✅ `dbt build` completes successfully (19 PASS, 1 WARN)
+✅ All schemas contain expected objects
+✅ Staging models created as views
+✅ Mart models created as tables/incremental tables
+✅ Snapshot table exists with historical data
+✅ Tests execute and report results
+✅ Selection syntax works for targeted runs
+
+---
+
+## Common Issues & Solutions
+
+### Issue: "Insufficient privileges to operate on table 'CUSTOMERS_SNAPSHOT'"
+
+**Cause:** DBT_ROLE lacks permissions on SNAPSHOTS schema
+
+**Fix:** Run in Snowflake as ACCOUNTADMIN:
+
+```sql
+USE ROLE ACCOUNTADMIN;
+GRANT USAGE ON SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
+GRANT CREATE TABLE ON SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
+GRANT ALL PRIVILEGES ON FUTURE TABLES IN SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
+```
+
+### Issue: Can't query snapshot table as ACCOUNTADMIN
+
+**Cause:** DBT_ROLE owns the snapshot table; ACCOUNTADMIN doesn't have automatic access
+
+**Fix:** Grant permissions to ACCOUNTADMIN:
+
+```sql
+USE ROLE ACCOUNTADMIN;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA OLIST_DB.SNAPSHOTS TO ROLE ACCOUNTADMIN;
+```
+
+### Issue: Snapshot doesn't detect changes
+
+**Cause:** Check columns might not be configured correctly
+
+**Verify:** Ensure `check_cols` includes columns that actually changed in your UPDATE
+
+---
+
+## Key Concepts Covered
+
+1. **Snapshots**
+   - SCD Type 2 implementation
+   - Check strategy vs timestamp strategy
+   - dbt snapshot metadata columns
+
+2. **Integration Testing**
+   - Full pipeline execution with `dbt build`
+   - Dependency resolution (DAG)
+   - End-to-end validation
+
+3. **Pipeline Architecture**
+   - Layered approach: source → staging → marts
+   - Seeds for reference data
+   - Tests for data quality
+
+4. **Selection Syntax** (preview)
+   - Targeting specific models
+   - Upstream/downstream dependencies
+   - Selective testing
+
+---
+
+## Next Steps
+
+In Module 05, you'll learn:
+- Advanced workflow commands
+- Selection syntax patterns
+- Tags and resource management
+- Debugging techniques

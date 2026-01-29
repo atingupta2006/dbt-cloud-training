@@ -97,11 +97,7 @@ Objective: Configure profiles.yml with Snowflake connection
 
 ### Steps
 
-```bash
-nano ~/.dbt/profiles.yml
-```
-
-Replace entire file with:
+Create `~/.dbt/profiles.yml` in VSCode with:
 
 ```yaml
 olist_dbt_project:
@@ -119,16 +115,16 @@ olist_dbt_project:
       threads: 4
 ```
 
-Set variables (replace values):
+Create `.env` file in project root (use VSCode):
 
-```bash
-export SNOWFLAKE_ACCOUNT="account_name"
-export SNOWFLAKE_USER="DBT_USER"
-export SNOWFLAKE_PASSWORD="StrongPassword@123"
-export SNOWFLAKE_ROLE="DBT_ROLE"
-export SNOWFLAKE_DATABASE="OLIST_DB"
-export SNOWFLAKE_WAREHOUSE="warehouse_name"
-export SNOWFLAKE_SCHEMA="analytics"
+```
+SNOWFLAKE_ACCOUNT=CSHDPGC-TI12670
+SNOWFLAKE_USER=DBT_USER
+SNOWFLAKE_PASSWORD=StrongPassword@123
+SNOWFLAKE_ROLE=DBT_ROLE
+SNOWFLAKE_DATABASE=OLIST_DB
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+SNOWFLAKE_SCHEMA=ANALYTICS
 ```
 
 ```bash
@@ -186,11 +182,7 @@ Objective: Set default materializations
 
 ### Steps
 
-```bash
-nano ~/olist_dbt_project/dbt_project.yml
-```
-
-Replace models section with:
+Open `~/olist_dbt_project/dbt_project.yml` in VSCode and update models section:
 
 ```yaml
 models:
@@ -223,19 +215,10 @@ Objective: Create staging and marts folders and first model
 ```bash
 mkdir -p ~/olist_dbt_project/models/staging
 mkdir -p ~/olist_dbt_project/models/marts
-```
-
-```bash
 rm -rf ~/olist_dbt_project/models/example
 ```
 
-Create staging model:
-
-```bash
-nano ~/olist_dbt_project/models/staging/stg_customers.sql
-```
-
-Paste:
+Create `~/olist_dbt_project/models/staging/stg_customers.sql` in VSCode:
 
 ```sql
 SELECT

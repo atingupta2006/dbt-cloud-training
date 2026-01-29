@@ -12,18 +12,21 @@
 
 **Objective**: Build staging models and downstream model using ref().
 
+**Concept: ref() Function**
+
+Replaces hard-coded table names with `{{ ref('model_name') }}`.
+
+Benefits:
+- Auto-resolves to correct database.schema.table
+- Builds dependency graph (DAG)
+- Controls execution order automatically
+- Tracks lineage between models
+
 ### Tasks
 
-1. Create staging directory
+1. Create `~/olist_dbt_project/models/staging/sources.yml` in VSCode:
 
-```bash
-mkdir -p ~/olist_dbt_project/models/staging
-```
-
-2. Create sources.yml file
-
-```bash
-cat > ~/olist_dbt_project/models/staging/sources.yml << 'EOF'
+```yaml
 version: 2
 
 sources:
@@ -40,21 +43,18 @@ sources:
         identifier: products
       - name: payments
         identifier: payments
-EOF
 ```
 
 **Note:** The database name (OLIST_DB) is inherited from your `profiles.yml` configuration.
 
-3. Create staging models
+2. Create staging model files in VSCode:
 
-```bash
-touch ~/olist_dbt_project/models/staging/stg_customers.sql
-touch ~/olist_dbt_project/models/staging/stg_orders.sql
-touch ~/olist_dbt_project/models/staging/stg_order_items.sql
-touch ~/olist_dbt_project/models/staging/stg_payments.sql
-```
+- `~/olist_dbt_project/models/staging/stg_customers.sql`
+- `~/olist_dbt_project/models/staging/stg_orders.sql`
+- `~/olist_dbt_project/models/staging/stg_order_items.sql`
+- `~/olist_dbt_project/models/staging/stg_payments.sql`
 
-4. Edit stg_customers.sql
+3. Add to `stg_customers.sql`:
 
 ```sql
 SELECT
@@ -105,13 +105,7 @@ FROM {{ source('olist_raw', 'payments') }}
 mkdir -p ~/olist_dbt_project/models/marts
 ```
 
-9. Create downstream model
-
-```bash
-touch ~/olist_dbt_project/models/marts/fct_orders.sql
-```
-
-10. Edit fct_orders.sql
+9. Create `~/olist_dbt_project/models/marts/fct_orders.sql` in VSCode:
 
 ```sql
 WITH orders AS (
@@ -154,15 +148,21 @@ Logs show staging models run before fct_orders
 
 **Objective**: Create fct_sales incremental model.
 
+**Concept: Incremental Models**
+
+Optimization for large tables—processes only new/changed data instead of full rebuild.
+
+Key components:
+- `materialized='incremental'`: Enables incremental logic
+- `unique_key`: Identifies rows for merge/upsert
+- `is_incremental()`: Adds filter on subsequent runs
+- `--full-refresh`: Forces complete rebuild
+
+First run builds full table; subsequent runs process only new records.
+
 ### Tasks
 
-1. Create model
-
-```bash
-touch ~/olist_dbt_project/models/marts/fct_sales.sql
-```
-
-2. Edit fct_sales.sql
+1. Create `~/olist_dbt_project/models/marts/fct_sales.sql` in VSCode:
 
 ```sql
 {{ config(
@@ -186,8 +186,7 @@ items AS (
         order_id,
         product_id,
         price,
-        freight_value,
-        CONCAT(order_id, '-', product_id) AS order_item_id
+        freight_value
     FROM {{ ref('stg_order_items') }}
 
 ),
@@ -218,15 +217,15 @@ joined AS (
 SELECT * FROM joined
 ```
 
-3. Run first time
+2. Run first time
 
 ```bash
 dbt run --select fct_sales
 ```
 
-4. Insert one new row into RAW.orders (in Snowflake)
+3. Insert one new row into RAW.orders (in Snowflake)
 
-5. Run again
+4. Run again
 
 ```bash
 dbt run --select fct_sales
@@ -246,17 +245,25 @@ Second run processes fewer rows than first
 
 ## Lab 3 — Source Freshness Configuration (20 min)
 
-**Objective**: Add freshness checks to existing sources.
+**Objective**: Add freshness checks to monitor data staleness.
+
+**Concept: Source Freshness**
+
+Monitors raw data staleness by checking timestamp columns.
+
+Key elements:
+- `loaded_at_field`: Timestamp column showing when data was last updated
+- `warn_after`: Warning threshold (e.g., 12 hours)
+- `error_after`: Error threshold (e.g., 24 hours)
+- `dbt source freshness`: Queries max timestamp and compares to current time
+
+Results: PASS (fresh), WARN (stale), or ERROR (very stale).
 
 ### Tasks
 
-1. Edit ~/olist_dbt_project/models/staging/sources.yml
+1. Update sources.yml to add freshness configuration
 
-```bash
-nano ~/olist_dbt_project/models/staging/sources.yml
-```
-
-2. Replace entire file with freshness configuration:
+Edit `~/olist_dbt_project/models/staging/sources.yml`:
 
 ```yaml
 version: 2
@@ -264,6 +271,13 @@ version: 2
 sources:
   - name: olist_raw
     schema: RAW
+    freshness:
+      warn_after:
+        count: 12
+        period: hour
+      error_after:
+        count: 24
+        period: hour
     tables:
       - name: customers
         identifier: customers
@@ -280,121 +294,147 @@ sources:
         identifier: payments
 ```
 
-3. Run staging models
+**Note:** We added freshness checks for `orders`, `customers`, and `order_items` tables. The `products` and `payments` tables don't have freshness checks configured (no `loaded_at_field`).
 
-```bash
-dbt run --select staging
-```
-
-4. Inspect compiled SQL
-
-```bash
-ls ~/olist_dbt_project/target/compiled
-```
-
-### Success
-
-Compiled SQL shows source() resolved correctly
-
-3. Update stg_customers.sql to use source function
-
-```bash
-nano ~/olist_dbt_project/models/staging/stg_customers.sql
-```
-
-Replace FROM clause with:
-
-```sql
-FROM {{ source('olist_raw','customers') }}
-```
-
-4. Update stg_orders.sql
-
-```bash
-nano ~/olist_dbt_project/models/staging/stg_orders.sql
-```
-
-Replace FROM clause with:
-
-```sql
-FROM {{ source('olist_raw','orders') }}
-```
-
-5. Update stg_order_items.sql
-
-```bash
-nano ~/olist_dbt_project/models/staging/stg_order_items.sql
-```
-
-Replace FROM clause with:
-
-```sql
-FROM {{ source('olist_raw','order_items') }}
-```
-
-3. Run staging only
-
-```bash
-dbt run --select staging
-```
-
-4. Inspect compiled SQL
-
-```bash
-ls target/compiled
-```
-
-### Success
-
-Compiled SQL shows source() resolved
-
----
-
-## Lab 4 — Configure and Run Source Freshness (20 min)
-
-**Objective**: Add freshness configuration and run checks.
-
-### Tasks
-
-1. Edit ~/olist_dbt_project/models/staging/sources.yml
-
-```bash
-nano ~/olist_dbt_project/models/staging/sources.yml
-```
-
-Replace content with:
-
-```yaml
-version: 2
-
-sources:
-  - name: olist_raw
-    schema: RAW
-    freshness:
-      warn_after:
-        count: 12
-        period: hour
-      error_after:
-        count: 24
-        period: hour
-    tables:
-      - name: orders
-        identifier: orders
-        loaded_at_field: order_purchase_timestamp
-      - name: customers
-        identifier: customers
-        loaded_at_field: customer_id
-      - name: order_items
-        identifier: order_items
-        loaded_at_field: order_id
-```
-
-2. Run freshness
+2. Run freshness checks
 
 ```bash
 dbt source freshness
 ```
 
+**Expected output:**
+```
+14:30:00 | Concurrency: 4 threads
+14:30:00 | 
+14:30:00 | 1 of 3 START freshness of olist_raw.orders ..................... [RUN]
+14:30:01 | 1 of 3 PASS freshness of olist_raw.orders ...................... [PASS in 0.8s]
+14:30:01 | 2 of 3 START freshness of olist_raw.customers .................. [RUN]
+14:30:02 | 2 of 3 WARN freshness of olist_raw.customers ................... [WARN in 0.7s]
+14:30:02 | 3 of 3 START freshness of olist_raw.order_items ................ [RUN]
+14:30:03 | 3 of 3 PASS freshness of olist_raw.order_items ................. [PASS in 0.6s]
+```
+
+**Note:** Some tables may show WARN status depending on when data was last loaded. This is expected for demo data.
+
+3. Inspect freshness results
+
+Check the generated JSON file:
+
+```bash
+cat ~/olist_dbt_project/target/sources.json
+```
+
+This contains detailed timestamps for each source table.
+
 ### Success
 
-Freshness output shows PASS/WARN per table
+✅ Freshness checks run successfully
+✅ Output shows PASS/WARN status for each configured table
+✅ sources.json file generated with detailed results
+
+---
+
+## Lab 4 — Verify Complete Pipeline (10 min)
+
+**Objective**: Test the complete Module 02 pipeline end-to-end.
+
+### Tasks
+
+1. Run all models
+
+```bash
+dbt run
+```
+
+**Expected output:**
+```
+14:30:00 | Concurrency: 4 threads
+14:30:00 | 
+14:30:00 | 1 of 6 START sql view model ANALYTICS.stg_customers ............ [RUN]
+14:30:00 | 2 of 6 START sql view model ANALYTICS.stg_orders ............... [RUN]
+14:30:00 | 3 of 6 START sql view model ANALYTICS.stg_order_items .......... [RUN]
+14:30:00 | 4 of 6 START sql view model ANALYTICS.stg_payments ............. [RUN]
+14:30:01 | 1 of 6 OK created sql view model ANALYTICS.stg_customers ....... [SUCCESS in 0.8s]
+14:30:01 | 2 of 6 OK created sql view model ANALYTICS.stg_orders .......... [SUCCESS in 0.9s]
+14:30:01 | 3 of 6 OK created sql view model ANALYTICS.stg_order_items ..... [SUCCESS in 0.8s]
+14:30:01 | 4 of 6 OK created sql view model ANALYTICS.stg_payments ........ [SUCCESS in 0.9s]
+14:30:01 | 5 of 6 START sql table model ANALYTICS.fct_orders .............. [RUN]
+14:30:02 | 5 of 6 OK created sql table model ANALYTICS.fct_orders ......... [SUCCESS in 1.2s]
+14:30:02 | 6 of 6 START sql incremental model ANALYTICS.fct_sales ......... [RUN]
+14:30:03 | 6 of 6 OK created sql incremental model ANALYTICS.fct_sales .... [SUCCESS in 1.0s]
+```
+
+2. Run freshness checks
+
+```bash
+dbt source freshness
+```
+
+3. Verify in Snowflake
+
+```sql
+-- Check staging views
+SHOW VIEWS IN SCHEMA OLIST_DB.ANALYTICS;
+
+-- Check mart tables
+SHOW TABLES IN SCHEMA OLIST_DB.ANALYTICS;
+
+-- Count records
+SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.fct_orders;
+SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.fct_sales;
+```
+
+### Success
+
+✅ All 6 models run successfully (4 staging views + 2 marts)
+✅ Staging models created as views
+✅ fct_orders created as table
+✅ fct_sales created as incremental table
+✅ Freshness checks complete
+✅ DAG executes in correct order (staging before marts)
+
+---
+
+## Module 02 Summary
+
+### What You Built
+
+**Staging Layer (4 models):**
+- stg_customers
+- stg_orders
+- stg_order_items
+- stg_payments
+
+**Marts Layer (2 models):**
+- fct_orders (table materialization)
+- fct_sales (incremental materialization)
+
+**Configuration:**
+- sources.yml with 5 source tables
+- Freshness checks on 3 tables
+
+### Key Concepts Mastered
+
+1. **ref() Function**: Build dependencies between models
+2. **source() Function**: Reference raw source tables
+3. **Incremental Models**: Optimize large table processing
+4. **Source Freshness**: Monitor data staleness
+5. **Materialization**: Views vs Tables vs Incremental
+6. **DAG**: Dependency graph and execution order
+
+### Commands Learned
+
+```bash
+dbt run                        # Run all models
+dbt run --select <model>       # Run specific model
+dbt run --full-refresh         # Rebuild incremental tables
+dbt source freshness           # Check source data freshness
+```
+
+### Next Steps
+
+Module 03 will cover:
+- Seeds for reference data
+- Generic tests (not_null, unique, relationships)
+- Custom singular tests
+- Data quality validation
