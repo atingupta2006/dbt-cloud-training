@@ -140,31 +140,87 @@ FROM {{ ref('stg_orders') }}
 
 ### Behavior
 
-* No table or view created
-* SQL inlined into downstream CTE
+* No table or view created in database
+* SQL is compiled and inlined as CTE in downstream models
+* Exists only during compilation, never materialized
 
-### Configure
+### Configure In Model
 
 ```sql
 {{ config(materialized='ephemeral') }}
 
 SELECT
     order_id,
-    payment_value
+    payment_value,
+    payment_value / 100.0 AS payment_value_dollars
 FROM {{ ref('stg_payments') }}
+```
+
+### Configure In dbt_project.yml
+
+To set ephemeral for entire folder:
+
+```yaml
+models:
+  training_project:
+    staging:
+      helpers:
+        +materialized: ephemeral
+```
+
+### How To Reference Ephemeral Models
+
+Reference ephemeral models exactly like any other model using `ref()`:
+
+```sql
+{{ config(materialized='table') }}
+
+-- This will inline the ephemeral model's SQL as a CTE
+SELECT
+    order_id,
+    payment_value_dollars
+FROM {{ ref('payment_helper') }}  -- payment_helper is ephemeral
+WHERE payment_value_dollars > 100
+```
+
+**Compiled Result:**
+```sql
+WITH payment_helper AS (
+    SELECT
+        order_id,
+        payment_value,
+        payment_value / 100.0 AS payment_value_dollars
+    FROM ANALYTICS.STG_PAYMENTS
+)
+SELECT
+    order_id,
+    payment_value_dollars
+FROM payment_helper
+WHERE payment_value_dollars > 100
 ```
 
 ### When To Use
 
-* Small reusable logic
-* Helper calculations
+* Small reusable transformations
+* Helper calculations used by multiple models
+* Intermediate logic that doesn't need to be queryable
+* DRY (Don't Repeat Yourself) principle for shared logic
+
+### When NOT To Use
+
+* Large datasets (repeated computation cost)
+* Models you need to query directly
+* Complex transformations (hard to debug)
+* Logic used by many downstream models (compile time increases)
 
 ### Pros / Cons
 
-| Pros          | Cons             |
-| ------------- | ---------------- |
-| No storage    | Harder debugging |
-| Faster builds | Repeated compute |
+| Pros                          | Cons                                |
+| ----------------------------- | ----------------------------------- |
+| No storage cost               | Harder to debug (no table to query) |
+| Faster builds (no DDL)        | Repeated computation in each model  |
+| Cleaner warehouse (no clutter)| Cannot query directly               |
+| Modular reusable logic        | Increases compile time              |
 
 ---
 
