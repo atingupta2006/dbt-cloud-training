@@ -328,41 +328,6 @@ Navigate to the lineage graph and explore:
 
 ---
 
-## Common Issues & Solutions
-
-### Issue: "Insufficient privileges to operate on table 'CUSTOMERS_SNAPSHOT'"
-
-**Cause:** DBT_ROLE lacks permissions on SNAPSHOTS schema
-
-**Fix:** Run in Snowflake as ACCOUNTADMIN:
-
-```sql
-USE ROLE ACCOUNTADMIN;
-GRANT USAGE ON SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
-GRANT CREATE TABLE ON SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
-GRANT ALL PRIVILEGES ON FUTURE TABLES IN SCHEMA OLIST_DB.SNAPSHOTS TO ROLE DBT_ROLE;
-```
-
-### Issue: Can't query snapshot table as ACCOUNTADMIN
-
-**Cause:** DBT_ROLE owns the snapshot table; ACCOUNTADMIN doesn't have automatic access
-
-**Fix:** Grant permissions to ACCOUNTADMIN:
-
-```sql
-USE ROLE ACCOUNTADMIN;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA OLIST_DB.SNAPSHOTS TO ROLE ACCOUNTADMIN;
-```
-
-### Issue: Snapshot doesn't detect changes
-
-**Cause:** Check columns might not be configured correctly
-
-**Verify:** Ensure `check_cols` includes columns that actually changed in your UPDATE
-
----
-
 ## Key Concepts Covered
 
 1. **Snapshots**
