@@ -115,9 +115,11 @@ olist_dbt_project:
       threads: 4
 ```
 
+**Important:** This configuration uses environment variables for security. Never hardcode credentials in profiles.yml.
+
 Create `.env` file in project root (use VSCode):
 
-```
+```bash
 SNOWFLAKE_ACCOUNT=CSHDPGC-TI12670
 SNOWFLAKE_USER=DBT_USER
 SNOWFLAKE_PASSWORD=StrongPassword@123
@@ -127,6 +129,12 @@ SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 SNOWFLAKE_SCHEMA=ANALYTICS
 ```
 
+**Security Note:**
+- The `.env` file stores sensitive credentials
+- Add `.env` to `.gitignore` to prevent committing credentials to git
+- In production, use secret management tools (AWS Secrets Manager, Azure Key Vault, etc.)
+- The DBT_ROLE has permissions configured in Module 00 to create and manage objects
+
 ```bash
 dbt debug
 ```
@@ -134,7 +142,23 @@ dbt debug
 Expected snippet:
 
 ```text
-Connection test: OK connection ok
+Configuration:
+  profiles.yml file [OK found and valid]
+  dbt_project.yml file [OK found and valid]
+
+Required dependencies:
+  - git [OK found]
+
+Connection:
+  account: CSHDPGC-TI12670
+  user: DBT_USER
+  database: OLIST_DB
+  warehouse: COMPUTE_WH
+  role: DBT_ROLE
+  schema: ANALYTICS
+  Connection test: [OK connection ok]
+
+All checks passed!
 ```
 
 ### Success
