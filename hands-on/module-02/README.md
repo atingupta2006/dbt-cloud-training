@@ -328,9 +328,9 @@ This contains detailed timestamps for each source table.
 
 ### Success
 
-✅ Freshness checks run successfully
-✅ Output shows PASS/WARN status for each configured table
-✅ sources.json file generated with detailed results
+ - ✅ Freshness checks run successfully
+ - ✅ Output shows PASS/WARN status for each configured table
+ - ✅ sources.json file generated with detailed results
 
 ---
 

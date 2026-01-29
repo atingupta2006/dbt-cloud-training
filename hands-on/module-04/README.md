@@ -145,11 +145,11 @@ ORDER BY customer_id, dbt_valid_from;
 
 ### Success Criteria
 
-✅ Snapshot table exists in SNAPSHOTS schema
-✅ Initial snapshot contains all customer records
-✅ After update, snapshot shows 2 versions for modified customer
-✅ Old version has `dbt_valid_to` timestamp
-✅ New version has `dbt_valid_to` = NULL
+ - ✅ Snapshot table exists in SNAPSHOTS schema
+ - ✅ Initial snapshot contains all customer records
+ - ✅ After update, snapshot shows 2 versions for modified customer
+ - ✅ Old version has `dbt_valid_to` timestamp
+ - ✅ New version has `dbt_valid_to` = NULL
 
 ---
 
@@ -318,13 +318,13 @@ Navigate to the lineage graph and explore:
 
 ### Success Criteria
 
-✅ `dbt build` completes successfully (19 PASS, 1 WARN)
-✅ All schemas contain expected objects
-✅ Staging models created as views
-✅ Mart models created as tables/incremental tables
-✅ Snapshot table exists with historical data
-✅ Tests execute and report results
-✅ Selection syntax works for targeted runs
+ - ✅ `dbt build` completes successfully (19 PASS, 1 WARN)
+ - ✅ All schemas contain expected objects
+ - ✅ Staging models created as views
+ - ✅ Mart models created as tables/incremental tables
+ - ✅ Snapshot table exists with historical data
+ - ✅ Tests execute and report results
+ - ✅ Selection syntax works for targeted runs
 
 ---
 

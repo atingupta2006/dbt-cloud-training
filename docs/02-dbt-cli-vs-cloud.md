@@ -38,11 +38,11 @@ Same capabilities as Cloud.
 
 ## Pros of dbt CLI
 
-✅ Full control
-✅ No vendor lock-in
-✅ Works offline (except warehouse)
-✅ Easy integration with GitHub
-✅ Good for learning
+ - ✅ Full control
+ - ✅ No vendor lock-in
+ - ✅ Works offline (except warehouse)
+ - ✅ Easy integration with GitHub
+ - ✅ Good for learning
 
 ---
 
@@ -84,10 +84,10 @@ Cloud runs dbt.
 
 ## Pros of dbt Cloud
 
-✅ No local setup
-✅ Built-in scheduler
-✅ Web UI
-✅ Centralized logs
+ - ✅ No local setup
+ - ✅ Built-in scheduler
+ - ✅ Web UI
+ - ✅ Centralized logs
 
 ---
 

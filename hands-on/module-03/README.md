@@ -281,8 +281,8 @@ dbt test --select assert_positive_order_totals
 
 ### Success
 
-✅ Custom test executes successfully
-✅ Test passes (returns 0 rows - no negative order totals found)
+ - ✅ Custom test executes successfully
+ - ✅ Test passes (returns 0 rows - no negative order totals found)
 
 ---
 
@@ -342,10 +342,10 @@ dbt test
 
 ### Success
 
-✅ 9 tests executed
-✅ 8 tests passed
-✅ 1 test warned (expected - demonstrates test failure behavior)
-✅ Test suite validates data quality
+ - ✅ 9 tests executed
+ - ✅ 8 tests passed
+ - ✅ 1 test warned (expected - demonstrates test failure behavior)
+ - ✅ Test suite validates data quality
 
 ---
 
