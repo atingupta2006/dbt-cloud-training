@@ -14,14 +14,14 @@
 
 ### Overview
 
-`dbt docs generate` creates comprehensive documentation including:
-- Model descriptions and column details
+`dbt docs generate` creates documentation:
+- Model descriptions and columns
 - Data lineage (DAG visualization)
 - Source freshness checks
 - Test results
-- Compiled SQL for each model
+- Compiled SQL
 
-`dbt docs serve` launches local web server to view documentation.
+`dbt docs serve` launches local web server to view docs.
 
 ### Tasks
 
@@ -40,8 +40,8 @@ Catalog written to target/catalog.json
 
 **What happened:**
 - Created `target/manifest.json` (project metadata)
-- Created `target/catalog.json` (database schema info)
-- Created `target/index.html` (documentation website)
+- Created `target/catalog.json` (database schema)
+- Created `target/index.html` (docs website)
 
 
 ### Task 2: Serve documentation locally
@@ -56,18 +56,15 @@ Serving docs at 8080
 To access from your browser, navigate to: http://localhost:8080
 ```
 
-**Note:**
-- Documentation server runs in foreground. Open browser to `http://localhost:8080`
+**Note:** Server runs in foreground. Open browser to `http://localhost:8080`
 
 
 ### Task 3: Explore documentation website
-
 
 Navigate through:
 - **Project Overview:** Summary of models, sources, tests
 - **Database Tab:** Browse schemas and tables
 - **DAG Tab:** Visual lineage graph
-
 
 Click on `fct_orders`:
 - View model SQL
@@ -106,7 +103,7 @@ Press `Ctrl+C` in terminal to stop server.
 
 ### Overview
 
-Documentation added to `schema.yml` files using `description` property. Appears in generated docs website.
+Documentation uses `description` property in `schema.yml` files.
 
 Best practices:
 - Describe business logic and purpose
@@ -119,7 +116,7 @@ Best practices:
 
 ### Task 1: Document staging models
 
-Open `~/olist_dbt_project/models/staging/schema.yml` in VSCode and update:
+Update `~/olist_dbt_project/models/staging/schema.yml`:
 
 ```yaml
 version: 2
@@ -171,7 +168,7 @@ models:
 
 ### Task 2: Document marts models
 
-Create `~/olist_dbt_project/models/marts/schema.yml` in VSCode (if doesn't exist or update existing):
+Create or update `~/olist_dbt_project/models/marts/schema.yml`:
 
 ```yaml
 version: 2
@@ -269,7 +266,7 @@ models:
 
 ### Task 3: Document sources
 
-Update `~/olist_dbt_project/models/staging/sources.yml` in VSCode to add descriptions (keep existing freshness, identifier, and loaded_at_field):
+Update `~/olist_dbt_project/models/staging/sources.yml` to add descriptions (keep existing freshness, identifier, and loaded_at_field):
 
 ```yaml
 version: 2
@@ -360,15 +357,15 @@ Open browser and navigate to:
 
 ### Overview
 
-Hooks are SQL statements that run at specific times:
-- **pre-hook**: Runs BEFORE model builds
-- **post-hook**: Runs AFTER model builds
+Hooks run SQL at specific times:
+- **pre-hook**: Before model builds
+- **post-hook**: After model builds
 
-Common use cases:
-- Grant permissions after table creation
-- Log execution metadata
+Common uses:
+- Grant permissions
+- Log metadata
 - Create indexes
-- Clean up temporary tables
+- Clean up temp tables
 - Validate row counts
 
 ### Tasks
@@ -376,7 +373,7 @@ Common use cases:
 
 ### Task 1: Add post-hook to grant permissions
 
-Update `~/olist_dbt_project/dbt_project.yml` in VSCode:
+Update `~/olist_dbt_project/dbt_project.yml`:
 
 ```yaml
 models:
@@ -389,8 +386,7 @@ models:
         - "GRANT SELECT ON {{ this }} TO ROLE ACCOUNTADMIN"
 ```
 
-**What this does:**
-- After each marts table is created, grants SELECT permission to ACCOUNTADMIN role.
+**What this does:** Grants SELECT permission to ACCOUNTADMIN after each marts table is created
 
 
 ### Task 2: Run model to test hook
@@ -400,14 +396,15 @@ dbt run --select fct_orders
 ```
 
 **Expected output (in logs):**
-- Running 1 post-hook for model olist_dbt_project.fct_orders
-- GRANT SELECT ON OLIST_DB.ANALYTICS.FCT_ORDERS TO ROLE ACCOUNTADMIN
+```
+Running 1 post-hook for model olist_dbt_project.fct_orders
+GRANT SELECT ON OLIST_DB.ANALYTICS.FCT_ORDERS TO ROLE ACCOUNTADMIN
+```
 
 
 ### Task 3: Add model-specific pre-hook
 
-
-**Step 1:** Create log table in Snowflake Web UI:
+**Step 1:** Create log table in Snowflake:
 
 ```sql
 USE DATABASE OLIST_DB;
@@ -424,7 +421,7 @@ GRANT INSERT ON TABLE OLIST_DB.ANALYTICS.model_run_log TO ROLE DBT_ROLE;
 ```
 
 
-**Step 2:** Create `~/olist_dbt_project/models/marts/fct_orders_with_log.sql` in VSCode:
+**Step 2:** Create `~/olist_dbt_project/models/marts/fct_orders_with_log.sql`:
 
 ```sql
 {{ config(
@@ -548,11 +545,10 @@ SELECT * FROM OLIST_DB.ANALYTICS.model_run_log;
 
 ### Key Concepts
 
-1. **Documentation as Code:** Descriptions live in schema.yml files alongside models
-2. **DAG Visualization:** Interactive lineage graph shows dependencies
-3. **Hooks for Automation:** SQL runs automatically before/after models
-4. **manifest.json:** Contains all project metadata
-5. **catalog.json:** Contains database schema information
+1. **Documentation as Code:** Descriptions in schema.yml files alongside models
+2. **DAG Visualization:** Interactive graph showing model dependencies
+3. **Hooks:** SQL that runs automatically before/after model builds
+4. **Artifacts:** manifest.json (metadata), catalog.json (schema), index.html (website)
 
 ### Commands Learned
 
@@ -623,16 +619,16 @@ target/
 ### Best Practices
 
 **Documentation:**
-- Write descriptions for all public models (marts)
-- Document complex transformations and business logic
-- Update docs when changing models
-- Use multi-line descriptions with `|` for readability
+- Document all public models (marts layer)
+- Explain complex transformations and business logic
+- Keep docs updated with model changes
+- Use `|` for multi-line descriptions
 
 **Hooks:**
-- Use post-hooks for permissions management
-- Use pre-hooks for setup tasks (create temp tables)
-- Keep hooks simple - complex logic belongs in models
-- Test hooks in development before production
+- Post-hooks: Permissions, indexes, grants
+- Pre-hooks: Setup tasks, temp tables
+- Keep hooks simple; complex logic belongs in models
+- Test in dev before production
 
 ### Next Steps
 

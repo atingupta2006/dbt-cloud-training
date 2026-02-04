@@ -10,15 +10,17 @@
 
 ## Lab 1: Debug Connection (15 min)
 
-**Objective:** Use `dbt debug` to verify and troubleshoot connection
+**Objective:** Use `dbt debug` to verify and troubleshoot your dbt setup and database connection
 
 ### Overview
 
-`dbt debug` performs a series of checks:
-- Python version compatibility
-- profiles.yml syntax
-- Database connection
-- Required dependencies
+`dbt debug` validates your dbt setup:
+- Python version and dependencies (git, etc.)
+- profiles.yml syntax and validity
+- Database connection with actual credentials
+- dbt_project.yml configuration
+
+Returns `[OK]` or `[ERROR]` for each check. Start here for troubleshooting.
 
 ### Tasks
 
@@ -53,42 +55,17 @@ All checks passed!
 
 ### Task 2 (Optional): Simulate connection error
 
-1. Open `.env` file in VSCode (located in project root).
-2. Change `SNOWFLAKE_PASSWORD` to an incorrect value and save.
-3. Run:
-    ```bash
-    dbt debug
-    ```
-    **Expected output:**
-    - Connection test shows `[ERROR]`
-4. Restore the correct password and verify again:
-    ```bash
-    dbt debug
-    ```
-    **Expected output:**
-    - All checks passed
+1. Open `.env` file and change `SNOWFLAKE_PASSWORD` to incorrect value
+2. Run `dbt debug` → Connection test shows `[ERROR]`
+3. Restore correct password and verify `dbt debug` passes
 
-Open `.env` file in VSCode (located in project root):
-
-Change `SNOWFLAKE_PASSWORD` to incorrect value, save.
-
-Run debug again:
-```bash
-dbt debug
-```
-
-**Expected:** Connection test shows [ERROR]
-
-Restore correct password and verify:
-```bash
-dbt debug
-```
+**Common errors**: Wrong credentials, network issues, warehouse not running, insufficient permissions
 
 ### Success Criteria
 
 - ✅ `dbt debug` shows all checks passed
-- ✅ Connection test returns [OK]
-- ✅ Understand debug output structure
+- ✅ Connection test returns `[OK]`
+- ✅ Can identify and fix connection errors
 
 ---
 
@@ -99,16 +76,25 @@ dbt debug
 ### Overview
 
 dbt provides three ways to access dynamic values:
-- **Variables (`var()`)**: Defined in `dbt_project.yml` or via CLI
-- **Target context (`target`)**: Current environment (dev, prod)
-- **Environment variables (`env_var()`)**: OS-level variables
+
+- **`var()`**: Project variables from `dbt_project.yml` or CLI. Make models parameterizable (e.g., filter list, thresholds).
+
+- **`target`**: Metadata about current environment:
+  - `target.name`: Profile name (dev, prod)
+  - `target.schema`: Target schema (ANALYTICS, PRODUCTION)
+  - `target.database`: Target database
+  - `target.type`: Database type (snowflake)
+  - `target.threads`: Parallel threads
+  - Enables environment-specific logic
+
+- **`env_var()`**: OS-level variables from `.env` file. Use for secrets (passwords, API keys).
 
 ### Tasks
 
 
 ### Task 1: Configure project variable
 
-Open `~/olist_dbt_project/dbt_project.yml` in VSCode:
+Open `~/olist_dbt_project/dbt_project.yml`:
 
 Verify the `vars` section exists (already added):
 ```yaml
@@ -122,9 +108,7 @@ vars:
 
 ### Task 2: Create model using variable
 
-Create `~/olist_dbt_project/models/marts/payment_filter.sql` in VSCode:
-
-Add content:
+Create `~/olist_dbt_project/models/marts/payment_filter.sql`:
 ```sql
 {{ config(materialized='view') }}
 
@@ -149,13 +133,9 @@ WHERE payment_type IN (
 dbt run --select payment_filter
 ```
 
-
 **Expected output:**
 - Compiles to `WHERE payment_type IN ('credit_card','debit_card')`
-
-**Verify:** View created successfully in ANALYTICS schema
-
-**Verify:** View created successfully in ANALYTICS schema
+- View created successfully in ANALYTICS schema
 
 
 ### Task 4: Override variable via CLI
@@ -170,7 +150,7 @@ dbt run --select payment_filter --vars "payment_methods: ['credit_card']"
 **Why:** Testing single payment method without changing code
 
 
-### Task 5: Use target and env_var
+### Task 5: Use target context
 
 Update `payment_filter.sql`:
 ```sql
@@ -190,13 +170,14 @@ WHERE payment_type IN (
 )
 ```
 
+**What this does:** Adds metadata columns showing environment and schema for audit tracking.
+
 Run:
 ```bash
 dbt run --select payment_filter
 ```
 
-**Expected output:**
-- Output includes `target_name` = 'dev' and `target_schema` = 'ANALYTICS'
+**Expected output:** `target_name` = 'dev', `target_schema` = 'ANALYTICS'
 
 ### Success Criteria
 
@@ -214,46 +195,44 @@ dbt run --select payment_filter
 ### Overview
 
 Macros are Jinja functions that generate SQL. Benefits:
-- **DRY principle**: Write once, use everywhere
-- **Consistency**: Centralized logic
-- **Maintainability**: Update in one place
+- **DRY**: Write once, reuse everywhere; update in one place
+- **Consistency**: Centralized logic across all models
+- **Maintainability**: Business rule changes propagate automatically
+- **Readability**: Hide complexity behind simple function calls
 
 ### Tasks
 
 
 ### Task 1: Create generate_alias macro
 
-Create `~/olist_dbt_project/macros/generate_alias.sql` in VSCode:
+Create `~/olist_dbt_project/macros/generate_alias.sql`:
 
-Add content:
 ```jinja
 {% macro generate_alias(table_name, prefix) %}
     {{ prefix }}_{{ table_name }}
 {% endmacro %}
 ```
 
-**What this does:** Takes two arguments, returns concatenated string
+**What this does:** Takes two arguments and returns concatenated string (e.g., `generate_alias('orders', 'fact')` → `'fact_orders'`)
 
 
 ### Task 2: Create cents_to_dollars macro
 
-Create `~/olist_dbt_project/macros/cents_to_dollars.sql` in VSCode:
+Create `~/olist_dbt_project/macros/cents_to_dollars.sql`:
 
-Add content:
 ```jinja
 {% macro cents_to_dollars(amount_col) %}
     ({{ amount_col }} / 100.0)
 {% endmacro %}
 ```
 
-**What this does:** Generates SQL division expression with parentheses
+**What this does:** Returns SQL division expression with parentheses for operator precedence
 
 
 ### Task 3: Use macros in model
 
-Create `~/olist_dbt_project/models/marts/order_amounts.sql` in VSCode:
+Create `~/olist_dbt_project/models/marts/order_amounts.sql`:
 
-Add content:
 ```sql
 {{ config(materialized='view') }}
 
@@ -264,7 +243,7 @@ SELECT
 FROM {{ ref('stg_payments') }}
 ```
 
-**What this does:** Uses both macros to generate SQL
+**What this does:** Calls multiple macros in a single model
 
 
 ### Task 4: Run and verify compilation
@@ -275,7 +254,7 @@ dbt run --select order_amounts
 
 Check compiled SQL:
 ```bash
-cat target/compiled/olist_dbt_project/models/marts/order_amounts.sql
+type target\compiled\olist_dbt_project\models\marts\order_amounts.sql
 ```
 
 **Expected output:**
@@ -286,29 +265,27 @@ SELECT
     'fact_orders' AS alias_name
 FROM OLIST_DB.ANALYTICS.STG_PAYMENTS
 ```
-**Key observation:**
-- Macros expanded to raw SQL
+
+**Key observation:** Macros expanded to raw SQL; `{{ }}` Jinja syntax is gone, only pure SQL remains
 
 
 ### Task 5: Create macro returning list
 
-Create `~/olist_dbt_project/macros/get_payment_methods.sql` in VSCode:
+Create `~/olist_dbt_project/macros/get_payment_methods.sql`:
 
-Add content:
 ```jinja
 {% macro get_payment_methods() %}
     {{ return(['credit_card','debit_card','voucher','boleto']) }}
 {% endmacro %}
 ```
 
-**What this does:** Returns Python list for use in tests
+**What this does:** Returns Python list for use in tests and WHERE clauses
 
 
 ### Task 6: Use macro in test
 
-Create `~/olist_dbt_project/models/marts/schema.yml` in VSCode:
+Create `~/olist_dbt_project/models/marts/schema.yml`:
 
-Add content:
 ```yaml
 version: 2
 
@@ -321,7 +298,7 @@ models:
               values: "{{ get_payment_methods() }}"
 ```
 
-**What this does:** Test validates payment_type against macro list
+**What this does:** Test uses macro to validate values; single source of truth for allowed payment methods
 
 
 ### Task 7: Run test
@@ -348,19 +325,20 @@ dbt test --select payment_filter
 
 ### Overview
 
-Date spine = continuous sequence of dates. Used for:
+A **date spine** is a continuous sequence of dates for your analysis period (a calendar dimension). Used for:
 - Filling gaps in time series data
-- Creating calendar dimensions
+- Creating calendar dimensions with calculated columns
 - Date-based joins
+
+This lab uses **recursive CTEs**: SQL technique that iteratively generates rows until a stopping condition
 
 ### Tasks
 
 
 ### Task 1: Create date_spine macro
 
-Create `~/olist_dbt_project/macros/date_spine.sql` in VSCode:
+Create `~/olist_dbt_project/macros/date_spine.sql`:
 
-Add content:
 ```jinja
 {% macro date_spine(start_date, end_date) %}
 WITH RECURSIVE dates AS (
@@ -375,23 +353,20 @@ FROM dates
 {% endmacro %}
 ```
 
-**What this does:** Generates recursive CTE with date sequence
-**Note:**
-- Snowflake requires `RECURSIVE` keyword
+**What this does:** Recursive CTE generates consecutive dates from start to end. Starting row sets first date, recursive query adds 1 day until end date reached
 
 
 ### Task 2: Create dim_date model
 
-Create `~/olist_dbt_project/models/marts/dim_date.sql` in VSCode:
+Create `~/olist_dbt_project/models/marts/dim_date.sql`:
 
-Add content:
 ```sql
 {{ config(materialized='table') }}
 
 {{ date_spine("'2016-01-01'", "'2018-12-31'") }}
 ```
 
-**What this does:** Entire model is macro invocation
+**What this does:** Entire model is macro invocation; materializes as table for reuse
 
 
 ### Task 3: Run model
@@ -400,28 +375,26 @@ Add content:
 dbt run --select dim_date
 ```
 
-**Expected output:**
-- Creates table with ~1,095 rows (3 years of dates)
+**Expected output:** Creates table with ~1,095 rows (3 years of dates)
 
 
 ### Task 4: Verify date range
 
-Query:
 ```bash
 snowsql -a %SNOWFLAKE_ACCOUNT% -u %SNOWFLAKE_USER% --authenticator externalbrowser -d OLIST_DB -s ANALYTICS -q "SELECT MIN(date_day), MAX(date_day), COUNT(*) FROM dim_date"
 ```
 
 **Expected output:**
-- MIN: 2016-01-01
-- MAX: 2018-12-31
-- COUNT: 1095
+```
+MIN(DATE_DAY)  | MAX(DATE_DAY)  | COUNT(*)
+2016-01-01     | 2018-12-31     | 1095
+```
 
 
 ### Task 5: Create join model using dim_date
 
-Create `~/olist_dbt_project/models/marts/orders_with_date.sql` in VSCode:
+Create `~/olist_dbt_project/models/marts/orders_with_date.sql`:
 
-Add content:
 ```sql
 {{ config(materialized='table') }}
 
@@ -435,7 +408,7 @@ INNER JOIN {{ ref('dim_date') }} d
     ON DATE(o.order_purchase_timestamp) = d.date_day
 ```
 
-**What this does:** Joins orders to calendar dimension
+**What this does:** Joins orders to calendar dimension; materializes to avoid recomputing join
 
 
 ### Task 6: Run full model
@@ -444,8 +417,7 @@ INNER JOIN {{ ref('dim_date') }} d
 dbt run --select orders_with_date
 ```
 
-**Expected output:**
-- Orders joined with date dimension
+**Expected output:** Orders joined with date dimension successfully
 
 ### Success Criteria
 
@@ -488,19 +460,17 @@ dbt run --select orders_with_date
 ### Key Concepts
 
 1. **Macros vs Models:**
-   - Macros = Jinja functions that generate SQL
-   - Models = SQL/Jinja files that create database objects
+   - **Macros**: Jinja functions that generate SQL code (in `macros/` folder). Don't create DB objects; return code snippets for models/tests.
+   - **Models**: SQL/Jinja files (in `models/`) that create DB objects (tables, views). Can call macros inside.
 
 2. **Variable Precedence:**
-   - CLI `--vars` > `dbt_project.yml vars` > macro defaults
+   - CLI `--vars` (highest)
+   - `dbt_project.yml vars` (middle)
+   - Hardcoded values (lowest)
 
-3. **Compilation:**
-   - Jinja rendered first → generates SQL → SQL executed
+3. **Compilation:** Read files → Render Jinja → Generate SQL → Execute SQL (compiled SQL in `target/compiled/`)
 
-4. **Code Reuse Benefits:**
-   - Single source of truth
-   - Easier maintenance
-   - Consistent business logic
+4. **Code Reuse Benefits:** Single source of truth, easier maintenance, consistent logic
 
 ### Project Structure After Module 06
 
