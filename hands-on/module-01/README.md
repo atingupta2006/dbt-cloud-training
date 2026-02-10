@@ -1,103 +1,88 @@
-# Module 01 Labs – DBT Setup & Project Structure
+# Module 01 – DBT Setup & Project Structure
 
-**Prerequisites:** Module 00 completed
-
-**Duration:** ~90 minutes
-
-**Instructor Note:** Demonstrate each lab while students follow along using the same commands.
+**Duration:** 4 hours (Sessions 1–2)
 
 ---
 
 ## Lab 1: Install DBT (20 min)
 
-Objective: Install dbt 1.9.8 inside Python virtual environment
-
-### Tasks
-
-1. Create virtual environment
-2. Activate virtual environment
-3. Install dbt-core and dbt-snowflake
-4. Verify installation
+**Why:** A virtual environment isolates project dependencies from system Python. Installing dbt-snowflake automatically pulls in dbt-core as a dependency.
 
 ### Steps
 
-```bash
-python3 -m venv ~/.venv
-```
+1. Create and activate virtual environment:
 
 ```bash
-source ~/.venv/bin/activate
-```
-
-```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install --upgrade pip
 ```
+
+2. Install dbt:
 
 ```bash
 pip install dbt-core==1.9.8 dbt-snowflake==1.9.8
 ```
 
+3. Verify:
+
 ```bash
 dbt --version
 ```
 
-Expected snippet:
-
-```text
-Core:
-  - installed: 1.9.8
-Plugins:
-  - snowflake: 1.9.8
-```
-
-### Success
-
-* dbt command works
-* Shows core 1.9.8 and snowflake adapter
+Expected output shows `installed: 1.9.8` for core and snowflake adapter.
 
 ---
 
 ## Lab 2: Initialize Project (20 min)
 
-Objective: Create dbt project
-
-### Tasks
-
-1. Initialize project
-2. Enter project directory
+**Why:** `dbt init` generates the standard project skeleton — `models/`, `dbt_project.yml`, `seeds/`, `tests/` — and creates `~/.dbt/profiles.yml` if it does not exist yet.
 
 ### Steps
+
+1. Initialize:
 
 ```bash
 dbt init olist_dbt_project
 ```
 
-Select profile: `olist_dbt_project`
+When prompted, select **Snowflake** as the adapter.
+
+2. Enter the project:
 
 ```bash
-cd ~/olist_dbt_project
+cd olist_dbt_project
 ```
 
-### Success
+3. Verify the skeleton:
 
-* Project created at ~/olist_dbt_project
-* profiles.yml created at ~/.dbt/profiles.yml
+```bash
+ls -F
+```
+
+You should see `dbt_project.yml`, `models/`, `seeds/`, `tests/`, etc.
 
 ---
 
 ## Lab 3: Configure Snowflake Connection (25 min)
 
-Objective: Configure profiles.yml with Snowflake connection
-
-### Tasks
-
-1. Edit profiles.yml
-2. Set environment variables
-3. Run dbt debug
+**Why:** dbt reads `~/.dbt/profiles.yml` at runtime to connect to your warehouse. We use `env_var()` so credentials are never hardcoded in files.
 
 ### Steps
 
-Create `~/.dbt/profiles.yml` in VSCode with:
+1. Export environment variables (replace with your actual credentials):
+
+```bash
+export SNOWFLAKE_ACCOUNT="your_account_id"
+export SNOWFLAKE_USER="DBT_USER"
+export SNOWFLAKE_PASSWORD="StrongPassword@123"
+export SNOWFLAKE_ROLE="DBT_ROLE"
+export SNOWFLAKE_DATABASE="OLIST_DB"
+export SNOWFLAKE_WAREHOUSE="COMPUTE_WH"
+export SNOWFLAKE_SCHEMA="ANALYTICS"
+```
+
+2. Open `~/.dbt/profiles.yml` in VSCode and replace contents with:
 
 ```yaml
 olist_dbt_project:
@@ -115,98 +100,31 @@ olist_dbt_project:
       threads: 4
 ```
 
-**Important:** This configuration uses environment variables for security. Never hardcode credentials in profiles.yml.
-
-Create `.env` file in project root (use VSCode):
-
-```bash
-SNOWFLAKE_ACCOUNT=CSHDPGC-TI12670
-SNOWFLAKE_USER=DBT_USER
-SNOWFLAKE_PASSWORD=StrongPassword@123
-SNOWFLAKE_ROLE=DBT_ROLE
-SNOWFLAKE_DATABASE=OLIST_DB
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_SCHEMA=ANALYTICS
-```
-
-**Security Note:**
-- The `.env` file stores sensitive credentials
-- Add `.env` to `.gitignore` to prevent committing credentials to git
-- In production, use secret management tools (AWS Secrets Manager, Azure Key Vault, etc.)
-- The DBT_ROLE has permissions configured in Module 00 to create and manage objects
+3. Test the connection:
 
 ```bash
 dbt debug
 ```
 
-Expected snippet:
+Expected output ends with `All checks passed!`
 
-```text
-Configuration:
-  profiles.yml file [OK found and valid]
-  dbt_project.yml file [OK found and valid]
-
-Required dependencies:
-  - git [OK found]
-
-Connection:
-  account: CSHDPGC-TI12670
-  user: DBT_USER
-  database: OLIST_DB
-  warehouse: COMPUTE_WH
-  role: DBT_ROLE
-  schema: ANALYTICS
-  Connection test: [OK connection ok]
-
-All checks passed!
-```
-
-### Success
-
-* All checks pass
-* Connection to Snowflake verified
-
----
-
-## Lab 4: Run Example Models (15 min)
-
-Objective: Run dbt example models to verify setup
-
-### Tasks
-
-1. Run example models
-
-### Steps
+4. Run the default example models to confirm everything works end-to-end:
 
 ```bash
 dbt run
 ```
 
-Expected snippet:
-
-```text
-Completed successfully
-```
-
-### Success
-
-* Example models build successfully
-
 ---
 
-## Lab 5: Configure dbt_project.yml (25 min)
+## Lab 4: Configure dbt_project.yml (25 min)
 
-Objective: Set default materializations
-
-### Tasks
-
-1. Open dbt_project.yml
-2. Set staging as views
-3. Set marts as tables
+**Why:** Setting materialization defaults at the folder level means every model in `staging/` becomes a view and every model in `marts/` becomes a table — without configuring each file individually.
 
 ### Steps
 
-Open `~/olist_dbt_project/dbt_project.yml` in VSCode and update models section:
+1. Open `dbt_project.yml` in VSCode.
+
+2. Update the `models` section:
 
 ```yaml
 models:
@@ -217,53 +135,46 @@ models:
       +materialized: table
 ```
 
-### Success
+3. Verify configs apply:
 
-* Configuration updated
+```bash
+dbt run
+```
 
 ---
 
-## Lab 6: Organize Folder Structure (30 min)
+## Lab 5: Organize Folder Structure (30 min)
 
-Objective: Create staging and marts folders and first model
-
-### Tasks
-
-1. Create folders
-2. Remove example models
-3. Create staging model
-4. Run staging models
+**Why:** Staging models clean raw data (views — lightweight). Marts models serve analytics (tables — performant). This layered separation is the foundation of every production dbt project.
 
 ### Steps
 
+1. Create directories and clean up defaults:
+
 ```bash
-mkdir -p ~/olist_dbt_project/models/staging
-mkdir -p ~/olist_dbt_project/models/marts
-rm -rf ~/olist_dbt_project/models/example
+mkdir -p models/staging
+mkdir -p models/marts
+rm -rf models/example
 ```
 
-Create `~/olist_dbt_project/models/staging/stg_customers.sql` in VSCode:
+2. Create `models/staging/stg_customers.sql` in VSCode:
 
 ```sql
 SELECT
     customer_id,
+    customer_unique_id,
+    customer_zip_code_prefix,
     customer_city,
     customer_state
 FROM OLIST_DB.RAW.customers
 ```
 
-**Note:** In Module 02, we'll learn to use the `source()` function instead of hardcoding table references.
+> In Module 02 we replace this file with a version that uses `source()` instead of the hardcoded table reference.
+
+3. Run the staging layer:
 
 ```bash
 dbt run --select staging
 ```
 
-Expected snippet:
-
-```text
-1 of 1 OK
-```
-
-### Success
-
-* Staging model builds as view
+The model builds as a view in your ANALYTICS schema.

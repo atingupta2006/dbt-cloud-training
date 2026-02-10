@@ -1,5 +1,7 @@
 # Module 00 – Snowflake Setup
 
+**Why:** Before dbt can transform data, we need a Snowflake environment with the right database, schemas, roles, and sample data loaded. This one-time setup creates everything dbt needs to connect and operate.
+
 **Prerequisites:** ACCOUNTADMIN access to Snowflake
 
 **Outcome:** Database, role, user, and sample data ready for dbt training
@@ -47,6 +49,7 @@ USE DATABASE OLIST_DB;
 
 CREATE SCHEMA IF NOT EXISTS RAW;
 CREATE SCHEMA IF NOT EXISTS ANALYTICS;
+CREATE SCHEMA IF NOT EXISTS ANALYTICS_DEV;
 CREATE SCHEMA IF NOT EXISTS SNAPSHOTS;
 ```
 
@@ -165,8 +168,8 @@ CREATE OR REPLACE TABLE payments (
 CREATE OR REPLACE TABLE products (
     product_id STRING,
     product_category_name STRING,
-    product_name_length INTEGER,
-    product_description_length INTEGER,
+    product_name_lenght INTEGER,
+    product_description_lenght INTEGER,
     product_photos_qty INTEGER,
     product_weight_g INTEGER,
     product_length_cm INTEGER,
@@ -201,6 +204,32 @@ FILE_FORMAT = csv_format;
 
 ---
 
+## Part 8: Load Data into Tables
+
+```sql
+USE DATABASE OLIST_DB;
+USE SCHEMA RAW;
+
+COPY INTO customers FROM @olist_stage/customers.csv;
+COPY INTO orders FROM @olist_stage/orders.csv;
+COPY INTO order_items FROM @olist_stage/order_items.csv;
+COPY INTO payments FROM @olist_stage/payments.csv;
+COPY INTO products FROM @olist_stage/products.csv;
+```
+
+Verify row counts:
+
+```sql
+SELECT 'customers' AS tbl, COUNT(*) AS rows FROM customers
+UNION ALL SELECT 'orders', COUNT(*) FROM orders
+UNION ALL SELECT 'order_items', COUNT(*) FROM order_items
+UNION ALL SELECT 'payments', COUNT(*) FROM payments
+UNION ALL SELECT 'products', COUNT(*) FROM products;
+```
+
+Expected: customers ~99K, orders ~99K, order_items ~112K, payments ~103K, products ~32K.
+
+---
 
 ## Connection Credentials for Students
 

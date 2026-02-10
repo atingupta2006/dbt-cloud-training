@@ -1,139 +1,181 @@
-# Module 08 – Environment Management (Labs)
+# Module 08 – Environment Management
+
+**Duration:** 2 hours (Session 15)
 
 ---
 
-## Lab 1 – Create Development Environment in dbt Cloud (25 min)
+## Lab 1: Create Development Environment in dbt Cloud (25 min)
 
-Objective: Create and validate a development environment in dbt Cloud
+**Why:** Separating dev from prod prevents accidental writes to production tables. In dbt Cloud, each environment has its own Snowflake schema, credentials, and dbt version.
 
-1. Open browser
-2. Go to [https://cloud.getdbt.com](https://cloud.getdbt.com)
-3. Create account or sign in
-4. Create new project
-5. Connect GitHub repository
-6. Choose adapter: Snowflake
-7. Open:
-   Account Settings → Projects → <project> → Environments
-8. Click: New Environment
-9. Name: Development
-10. Type: Development
-11. dbt Version: 1.9.8
-12. Threads: 4
-13. Adapter: Snowflake
-14. Database: OLIST_DB
-15. Schema: ANALYTICS_DEV
-16. Warehouse: COMPUTE_WH
-17. Enter personal Snowflake user and password
-18. Click Save
-19. Open Cloud IDE
-20. Run:
+### Steps
 
+1. Open browser → [https://cloud.getdbt.com](https://cloud.getdbt.com)
+2. Create account or sign in
+3. Create a new project and connect your GitHub repository
+4. Navigate to **Account Settings → Projects → Your Project → Environments**
+5. Click **New Environment**
+6. Configure:
+
+| Setting | Value |
+|---------|-------|
+| Name | Development |
+| Type | Development |
+| dbt Version | 1.9.8 |
+| Adapter | Snowflake |
+| Database | OLIST_DB |
+| Schema | ANALYTICS_DEV |
+| Warehouse | COMPUTE_WH |
+| Threads | 4 |
+
+7. Enter your personal Snowflake user and password
+8. Click **Save**
+9. Open the Cloud IDE and run:
+
+```bash
 dbt debug
+```
 
-Success: Connection test returns OK
-
----
-
-## Lab 2 – Create Production Environment in dbt Cloud (20 min)
-
-Objective: Create separate production environment
-
-1. Open:
-   Account Settings → Projects → <project> → Environments
-2. Click: New Environment
-3. Name: Production
-4. Type: Deployment
-5. dbt Version: 1.9.8
-6. Threads: 8
-7. Adapter: Snowflake
-8. Database: OLIST_DB
-9. Schema: ANALYTICS
-10. Warehouse: COMPUTE_WH
-11. Enter production Snowflake user and password
-12. Click Save
-13. Click Test Connection
-
-Success: Production environment saved and tested
+Connection test should return `[OK]`.
 
 ---
 
-## Lab 3 – Compare CLI Multi-Target vs Cloud Environments (20 min)
+## Lab 2: Create Production Environment in dbt Cloud (20 min)
 
-Objective: Observe schema change using CLI target and Cloud environment
+**Why:** Production uses a separate schema (ANALYTICS instead of ANALYTICS_DEV) and potentially higher thread count for faster execution.
 
-1. Open ~/.dbt/profiles.yml in VSCode
+### Steps
 
-2. Confirm dev target schema = ANALYTICS_DEV
+1. Navigate to **Account Settings → Projects → Your Project → Environments**
+2. Click **New Environment**
+3. Configure:
 
-3. Confirm prod target schema = ANALYTICS
+| Setting | Value |
+|---------|-------|
+| Name | Production |
+| Type | Deployment |
+| dbt Version | 1.9.8 |
+| Adapter | Snowflake |
+| Database | OLIST_DB |
+| Schema | ANALYTICS |
+| Warehouse | COMPUTE_WH |
+| Threads | 8 |
 
-4. From project root:
-
-   dbt run --target dev
-
-5. Open Snowflake UI → Worksheets
-
-6. Run:
-
-   SELECT COUNT(*) FROM OLIST_DB.ANALYTICS_DEV.STG_CUSTOMERS;
-
-7. From project root:
-
-   dbt run --target prod
-
-8. In Snowflake UI run:
-
-   SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.STG_CUSTOMERS;
-
-9. Open dbt Cloud IDE
-
-10. Ensure Development environment selected
-
-11. Run:
-
-    dbt run --select stg_customers
-
-Success: Same model created in two different schemas
+4. Enter production Snowflake credentials
+5. Click **Save**
+6. Click **Test Connection** to verify
 
 ---
 
-## Lab 4 – Environment-Specific Logic (15 min)
+## Lab 3: Compare CLI Multi-Target vs Cloud Environments (20 min)
 
-Objective: Change model behavior based on environment
+**Why:** CLI uses `--target` flags in `profiles.yml` to switch environments. dbt Cloud uses the environment selector in the UI. Both achieve the same result — models landing in different schemas.
 
-1. Create ./models/marts/orders_env_demo.sql in VSCode
+### Steps
 
-2. Add:
+1. Open `~/.dbt/profiles.yml` in VSCode. Add a prod target under the existing dev:
 
-   SELECT
-   order_id,
-   customer_id,
-   order_status,
-   order_purchase_timestamp
-   FROM {{ ref('stg_orders') }}
+```yaml
+olist_dbt_project:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: ANALYTICS_DEV
+      threads: 4
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: ANALYTICS
+      threads: 8
+```
 
-   {% if target.name == 'dev' %}
-   LIMIT 1000
-   {% endif %}
+2. Run against dev:
 
-3. Run locally:
+```bash
+dbt run --target dev --select stg_customers
+```
 
-   dbt run --select orders_env_demo --target dev
+3. Verify in Snowflake Web UI:
 
-4. In Snowflake UI:
+```sql
+SELECT COUNT(*) FROM OLIST_DB.ANALYTICS_DEV.STG_CUSTOMERS;
+```
 
-   SELECT COUNT(*) FROM OLIST_DB.ANALYTICS_DEV.ORDERS_ENV_DEMO;
+4. Run against prod:
 
-5. Run locally:
+```bash
+dbt run --target prod --select stg_customers
+```
 
-   dbt run --select orders_env_demo --target prod
+5. Verify in Snowflake Web UI:
 
-6. In Snowflake UI:
+```sql
+SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.STG_CUSTOMERS;
+```
 
-   SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.ORDERS_ENV_DEMO;
+Same model, two different schemas.
 
-Success: Dev table limited, prod table full size
+> **Important:** After this change, the dev target now builds to `ANALYTICS_DEV` instead of `ANALYTICS`. All subsequent `dbt run` commands (without `--target`) will use `ANALYTICS_DEV`. Your existing models in `ANALYTICS` remain untouched.
 
 ---
 
-End of Module 08 Labs
+## Lab 4: Environment-Specific Logic (15 min)
+
+**Why:** Dev datasets should be small (fast iteration). Prod datasets must be complete. Using `target.name` lets you LIMIT rows in dev without changing any config.
+
+### Steps
+
+1. Create `models/marts/orders_env_demo.sql` in VSCode:
+
+```sql
+SELECT
+    order_id,
+    customer_id,
+    order_status,
+    order_purchase_timestamp
+FROM {{ ref('stg_orders') }}
+
+{% if target.name == 'dev' %}
+LIMIT 1000
+{% endif %}
+```
+
+2. Run in dev:
+
+```bash
+dbt run --select orders_env_demo --target dev
+```
+
+3. Verify row count in Snowflake Web UI:
+
+```sql
+SELECT COUNT(*) FROM OLIST_DB.ANALYTICS_DEV.ORDERS_ENV_DEMO;
+```
+
+Expected: 1,000 rows.
+
+4. Run in prod:
+
+```bash
+dbt run --select orders_env_demo --target prod
+```
+
+5. Verify:
+
+```sql
+SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.ORDERS_ENV_DEMO;
+```
+
+Expected: full dataset (~99,000 rows).

@@ -1,422 +1,179 @@
-# Module 05 – Development Workflow & Selection Syntax
+# Module 05 – Development Workflow & Project Organization
 
-**Prerequisites:** Module 04 completed
-
-**Duration:** ~90 minutes
-
-**Instructor Note:** This module focuses on dbt workflow commands and model selection patterns. Students practice targeted execution and understand the DAG.
+**Duration:** 4 hours (Sessions 9–10)
 
 ---
 
-## Lab 1: Core Workflow Commands (30 min)
+## Lab 1: Run-Test-Build Workflow (30 min)
 
-**Objective:** Execute core dbt commands and observe dependency behavior
+**Why:** You rarely run the entire project. Efficient development means running specific models, testing them, and using `dbt build` for full pipeline validation.
 
-### Overview
+### Steps
 
-dbt provides several commands for different workflows:
-- `dbt run`: Execute models (create tables/views)
-- `dbt test`: Run data quality tests
-- `dbt build`: Run models, tests, snapshots, seeds in DAG order
-- `dbt compile`: Compile Jinja to SQL without running
-- `dbt snapshot`: Execute snapshots only
-
-### Tasks
-
-#### 1. Run a single staging model
+1. Run a single model:
 
 ```bash
 dbt run --select stg_customers
 ```
 
-**Expected output:**
-```
-Completed successfully
-Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1
-```
-
-**What happened:** Only `stg_customers` view was created/updated
-
-#### 2. Run model with all downstream dependencies
+2. Run a model and everything downstream (+ suffix):
 
 ```bash
 dbt run --select stg_customers+
 ```
 
-**Expected output:**
-- Runs `stg_customers` and all models that depend on it (downstream), e.g. `fct_orders`.
-- Syntax: `model_name+` = model + all downstream
+This runs `stg_customers` first, then any model that depends on it (e.g., `fct_orders`).
 
-#### 3. Run model with all upstream dependencies
+3. Run a model and everything upstream (+ prefix):
 
 ```bash
 dbt run --select +fct_orders
 ```
 
-**Expected output:**
-- Runs all models that `fct_orders` depends on (upstream), plus `fct_orders` itself. E.g. `stg_customers`, `stg_orders`, then `fct_orders`.
-- Syntax: `+model_name` = all upstream + model
+This runs all ancestors of `fct_orders` first, then `fct_orders` itself.
 
-#### 4. Test a single model
+4. Test a specific model:
 
 ```bash
 dbt test --select stg_orders
 ```
 
-**Expected output:**
-- Runs all tests configured for `stg_orders` (not_null, unique, relationships, accepted_values)
-
-#### 5. Build entire project
+5. Build entire project (run + test + seed + snapshot in DAG order):
 
 ```bash
 dbt build
 ```
 
-**Expected output:**
-```
-Completed with 1 warning
-Done. PASS=19 WARN=1 ERROR=0 SKIP=0 TOTAL=20
-```
-
-**What happened:** 
-- Loaded seed (product_categories)
-- Ran all models in dependency order
-- Executed snapshots
-- Ran all tests
-
-#### 6. Build only staging directory
+6. Build only a specific directory:
 
 ```bash
 dbt build --select staging
 ```
 
-**Expected output:**
-- Runs all models in the `staging` directory and their tests only.
-
-### Success Criteria
-
-- ✅ Single model execution works
-- ✅ Dependency operators (+, +model) execute correctly
-- ✅ `dbt build` runs full pipeline
-- ✅ Understand execution order from logs
-
 ---
 
-## Lab 2: Selection Syntax Patterns (25 min)
+## Lab 2: Model Selection Syntax (20 min)
 
-**Objective:** Practice model selectors and exclusion
+**Why:** In large projects with hundreds of models, precise selection saves time and compute. You need to target exactly what you want without running everything.
 
-### Overview
+### Steps
 
-Selection syntax patterns:
-- **Path selector:** `staging` or `marts` (directory name)
-- **Wildcard:** `stg_*` (matches pattern)
-- **Exclusion:** `--exclude model_name`
-- **Graph operators:** `+model`, `model+`, `+model+`
-
-### Tasks
-
-#### 1. Run all staging models using path selector
+1. Run all staging models:
 
 ```bash
-dbt run --select staging
+dbt run --select staging.*
 ```
 
-**Expected output:**
-- Runs all 5 staging models:
-	- stg_customers
-	- stg_orders
-	- stg_order_items
-	- stg_payments
-	- stg_products
-
-#### 2. Run all marts models
+2. Run all marts except one expensive model:
 
 ```bash
-dbt run --select marts
+dbt run --select marts --exclude fct_sales
 ```
 
-**Expected output:**
-- Runs all 3 mart models:
-	- fct_orders
-	- fct_sales
-	- products_with_categories
+3. Add a tag to a model — open `models/staging/schema.yml` in VSCode and add:
 
-#### 3. Exclude specific model
+```yaml
+  - name: stg_orders
+    config:
+      tags: ['daily']
+```
+
+4. Run by tag:
 
 ```bash
-dbt run --select marts --exclude fct_orders
+dbt run --select tag:daily
 ```
 
-**Expected output:**
-- Runs only:
-	- fct_sales
-	- products_with_categories
-
-**Why:** Skip expensive models during development
-
-#### 4. Run snapshots only
-
-```bash
-dbt snapshot
-```
-
-**Expected output:**
-- Executes `customers_snapshot` only
-
-#### 5. Build staging with tests
-
-```bash
-dbt build --select staging
-```
-
-**Expected output:**
-- Runs all 5 staging models and their 9 associated tests
-
-### Success Criteria
-
-- ✅ Path selectors work (staging, marts)
-- ✅ Exclusion filters out models
-- ✅ Different resource types can be targeted
-- ✅ Build includes both models and tests
-
----
-
-## Lab 3: Graph Operators & Wildcards (20 min)
-
-**Objective:** Use advanced selection patterns
-
-### Tasks
-
-#### 1. Run model with all downstream (+ suffix)
-
-```bash
-dbt run --select stg_orders+
-```
-
-**Expected output:**
-- Runs `stg_orders` and all downstream models:
-	- fct_orders
-	- fct_sales
-
-**Why:** Both `fct_orders` and `fct_sales` depend on `stg_orders`
-
-#### 2. Run model with all upstream (+ prefix)
-
-```bash
-dbt run --select +fct_sales
-```
-
-**Expected output:**
-- Runs all upstream models and `fct_sales`:
-	- stg_orders
-	- stg_order_items
-	- fct_sales
-
-**Why:** `fct_sales` depends on those staging models
-
-#### 3. Run model with 1 degree upstream
-
-```bash
-dbt run --select 1+fct_orders
-```
-
-**Expected output:**
-- Runs only 1 degree upstream models and `fct_orders`:
-	- stg_customers
-	- stg_orders
-	- fct_orders
-- Syntax: `N+model` = N degrees of upstream ancestors
-
-#### 4. Wildcard selector (all staging models)
-
-```bash
-dbt run --select stg_*
-```
-
-**Expected output:**
-- Runs all models starting with `stg_`
-
-#### 5. Combine selectors
-
-```bash
-dbt run --select stg_customers+ --exclude fct_sales
-```
-
-**Expected output:**
-- Runs `stg_customers` and all downstream models except `fct_sales`:
-	- stg_customers
-	- fct_orders
-
-### Success Criteria
-
-- ✅ Graph operators work (+ prefix, suffix, degree)
-- ✅ Wildcards match patterns
-- ✅ Multiple selectors can be combined
-- ✅ Understand DAG execution order
-
----
-
-## Lab 4: Compile & Utility Commands (15 min)
-
-**Objective:** Use dbt utility commands for debugging
-
-### Tasks
-
-#### 1. Compile models without running
-
-```bash
-dbt compile
-```
-
-**Expected output:**
-- Generates SQL files in `target/compiled/` folder
-
-**Why:** Review generated SQL before execution
-
-#### 2. Inspect compiled SQL
-
-Open file:
-```bash
-cat target/compiled/olist_dbt_project/models/marts/fct_orders.sql
-```
-**What to see:**
-- Jinja rendered to plain SQL with {{ ref() }} resolved to actual table names
-
-#### 3. Parse project (validate syntax)
-
-```bash
-dbt parse
-```
-
-**Expected output:**
-- Creates `target/manifest.json` with project metadata
-
-**Why:** Validate Jinja/YAML syntax without running models
-
-#### 4. List models based on selection
+5. Preview what a selection would run (without actually running):
 
 ```bash
 dbt list --select +fct_orders
 ```
 
-**Expected output:**
-- Lists all resources that would be run with the selection, e.g.:
-	- source:olist_dbt_project.olist_raw.customers
-	- source:olist_dbt_project.olist_raw.orders
-	- olist_dbt_project.stg_customers
-	- olist_dbt_project.stg_orders
-	- olist_dbt_project.fct_orders
-
-**Why:** Preview what would run with a selection
-
-#### 5. Show model information
-
-```bash
-dbt list --select fct_orders --output json
-```
-
-**Expected output:**
-- JSON with model metadata (path, materialization, dependencies)
-
-### Success Criteria
-
-- ✅ `dbt compile` generates SQL without running
-- ✅ Compiled SQL shows resolved references
-- ✅ `dbt parse` validates syntax
-- ✅ `dbt list` previews selections
-
 ---
 
-## Module 05 Summary
+## Lab 3: Refactor to Layers (50 min)
 
-### What You Practiced
+**Why:** Monolithic SQL (all joins and logic in one file) is hard to debug, test, and maintain. Layering separates concerns: Staging cleans, Intermediate enriches, Marts serves. The intermediate layer uses `ephemeral` materialization — it generates no physical table, just inlined SQL.
 
-**Workflow Commands:**
-- `dbt run` - Execute models
-- `dbt test` - Run tests
-- `dbt build` - Run everything in DAG order
-- `dbt compile` - Generate SQL
-- `dbt parse` - Validate syntax
-- `dbt snapshot` - Run snapshots
-- `dbt list` - Preview selections
+### Scenario
 
-**Selection Syntax:**
-- `--select model_name` - Single model
-- `--select +model_name` - Upstream + model
-- `--select model_name+` - Model + downstream
-- `--select N+model_name` - N degrees upstream
-- `--select path/` - Directory
-- `--select pattern*` - Wildcard
-- `--exclude model_name` - Exclude from selection
+We want to create `dim_customers_enhanced` — a customer dimension with order history stats. Instead of writing all logic in one file, we split it across three layers.
 
-**Key Concepts:**
-1. **DAG (Directed Acyclic Graph):** Dependencies determine execution order
-2. **Graph Operators:** Navigate upstream (+) and downstream (+)
-3. **Path Selectors:** Target entire directories
-4. **Exclusion:** Skip specific models
-5. **Compilation:** Preview SQL before execution
+### Steps
 
-### Commands Reference
+1. Ensure `models/staging/stg_orders.sql` exists (created in Module 02). It should select clean columns from `source('olist_raw', 'orders')`.
+
+2. Create the intermediate directory:
 
 ```bash
-# Single model
-dbt run --select stg_customers
-
-# With dependencies
-dbt run --select +fct_orders          # upstream + model
-dbt run --select stg_customers+       # model + downstream
-dbt run --select +fct_orders+         # upstream + model + downstream
-
-# Directory
-dbt run --select staging              # all in staging/
-dbt run --select marts                # all in marts/
-
-# Wildcards
-dbt run --select stg_*                # all starting with stg_
-dbt run --select *orders*             # all containing 'orders'
-
-# Exclusion
-dbt run --select marts --exclude fct_sales
-
-# Combinations
-dbt run --select stg_customers+ --exclude fct_sales
-
-# Utilities
-dbt compile                           # Generate SQL
-dbt parse                             # Validate syntax
-dbt list --select +fct_orders         # Preview selection
-dbt build                             # Run everything
+mkdir -p models/intermediate
 ```
 
-### Project Structure After Module 05
+3. Create `models/intermediate/int_customer_order_history.sql` in VSCode:
 
-```
-models/
-├── staging/
-│   ├── stg_customers.sql (view)
-│   ├── stg_orders.sql (view)
-│   ├── stg_order_items.sql (view)
-│   ├── stg_payments.sql (view)
-│   ├── stg_products.sql (view)
-│   ├── sources.yml
-│   └── schema.yml (9 tests)
-├── marts/
-│   ├── fct_orders.sql (table)
-│   ├── fct_sales.sql (incremental)
-│   └── products_with_categories.sql (view)
-seeds/
-└── product_categories.csv (7 rows)
-snapshots/
-└── customers_snapshot.sql (SCD Type 2)
-tests/
-└── assert_positive_order_totals.sql (custom test)
+```sql
+{{ config(materialized='ephemeral') }}
+
+SELECT
+    customer_id,
+    MIN(order_purchase_timestamp) AS first_order_date,
+    MAX(order_purchase_timestamp) AS last_order_date,
+    COUNT(order_id) AS total_orders
+FROM {{ ref('stg_orders') }}
+GROUP BY customer_id
 ```
 
-### Next Steps
+> Ephemeral models don't create tables or views. dbt inlines the SQL as a CTE wherever it's referenced.
 
-Module 06 will cover:
-- Debugging with `dbt debug`
-- Variables and Jinja templating
-- Creating reusable macros
-- Advanced Jinja patterns
+4. Create `models/marts/dim_customers_enhanced.sql` in VSCode:
+
+```sql
+WITH customers AS (
+    SELECT * FROM {{ ref('stg_customers') }}
+),
+
+order_history AS (
+    SELECT * FROM {{ ref('int_customer_order_history') }}
+)
+
+SELECT
+    c.customer_id,
+    c.customer_unique_id,
+    c.customer_city,
+    c.customer_state,
+    h.first_order_date,
+    h.last_order_date,
+    h.total_orders
+FROM customers c
+LEFT JOIN order_history h
+    ON c.customer_id = h.customer_id
+```
+
+5. Update the `models` section of your `dbt_project.yml` to include the intermediate layer. Replace the existing `models:` block with this complete version (it keeps staging and marts from Module 01 and adds intermediate):
+
+```yaml
+models:
+  olist_dbt_project:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: table
+```
+
+6. Build and verify:
+
+```bash
+dbt build --select +dim_customers_enhanced
+```
+
+7. Confirm `int_customer_order_history` does NOT exist as a table or view in Snowflake:
+
+```sql
+SHOW VIEWS IN SCHEMA OLIST_DB.ANALYTICS;
+SHOW TABLES IN SCHEMA OLIST_DB.ANALYTICS;
+```
+
+Only `dim_customers_enhanced` appears as a table. The ephemeral intermediate model was inlined as a CTE.
