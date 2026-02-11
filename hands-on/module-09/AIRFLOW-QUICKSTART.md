@@ -83,6 +83,10 @@ Key-value pairs stored in Airflow for runtime configuration. Example: `dbt_cloud
 
 ### Option A: pip install (simplest for learning)
 
+> [!CAUTION]
+> **CRITICAL: AIRFLOW VERSION PINNING**  
+> **DO NOT** run `pip install apache-airflow` without a version pin. As of February 2025, running a plain install will attempt to install **Airflow 3.0 (Alpha/Beta)**, which is NOT compatible with these labs and will cause environment conflicts. Always use version `2.9.3` as shown below.
+
 1. Create a dedicated virtual environment (separate from dbt):
 
 ```bash
@@ -101,13 +105,22 @@ export AIRFLOW_HOME=~/airflow-demo/airflow_home
 3. Install Airflow (pinned to a compatible version):
 
 ```bash
+# Automatically detect Python version for constraints
+PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
+
 pip install "apache-airflow==2.9.3" \
-  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.10.txt"
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-${PYTHON_VERSION}.txt"
 ```
 
 > This takes 2–5 minutes. The `--constraint` flag ensures compatible dependency versions.
 
-4. Initialize the metadata database:
+4. **Verify Version (CRITICAL):**
+```bash
+airflow version
+# Expected Output: 2.9.3 (Anything starting with 3.x is INCORRECT)
+```
+
+5. Initialize the metadata database:
 
 ```bash
 airflow db migrate
@@ -315,7 +328,12 @@ trigger_dbt = DbtCloudRunJobOperator(
 )
 ```
 
-> **Pre-requisite:** Install the dbt Cloud provider package: `pip install apache-airflow-providers-dbt-cloud`
+> **Pre-requisite:** Install the dbt Cloud provider package. Use constraints to avoid accidental Airflow upgrades:
+> ```bash
+> PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
+> pip install "apache-airflow-providers-dbt-cloud" \
+>   --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-${PYTHON_VERSION}.txt"
+> ```
 
 ### DbtCloudJobRunSensor — Wait for dbt Cloud job completion
 

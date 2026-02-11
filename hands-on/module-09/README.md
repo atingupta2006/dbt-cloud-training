@@ -48,6 +48,11 @@ Both CLI and Cloud produce identical results — the difference is where the exe
 
 **Why:** Scheduled jobs ensure your warehouse is refreshed automatically. Without scheduling, someone has to manually run `dbt build` every day — that does not scale.
 
+### Pre-requisite: Sync your CLI changes to Git
+Before creating a job, ensure your dbt Cloud environment has the latest code:
+1. If you made changes on the **Remote VM** or locally, `commit` and `push` them to your Git repository (GitHub/GitLab).
+2. In dbt Cloud, ensured your **Environment** is pointed to the correct branch (e.g., `main`).
+
 ### Steps
 
 1. In dbt Cloud, navigate to **Deploy → Jobs**
@@ -104,25 +109,42 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
 
 **Prerequisite:** You must have read [AIRFLOW-QUICKSTART.md](AIRFLOW-QUICKSTART.md) before this lab. It covers installation, core concepts, and operator basics.
 
+### Execution Mode: Remote VM vs Local (Choose one)
+
+This lab can be performed on your local machine if you have Airflow installed, OR on the provided **Remote CentOS VM**.
+
+- **If using the Remote VM:**
+  - Connection details are in your `.env` file (`192.168.56.101`).
+  - You can use the `scripts/vm_manager.py` tool to check status:
+    ```bash
+    .venv/Scripts/python scripts/vm_manager.py status
+    ```
+  - SSH into the VM: `ssh root@192.168.56.101` (password: `osboxes.org`).
+  - Activate the Airflow environment:
+    ```bash
+    cd ~/airflow-demo
+    source airflow_venv/bin/activate
+    export AIRFLOW_HOME=~/airflow-demo/airflow_home
+    ```
+
 ### Part A: Verify Airflow Is Running (10 min)
 
-1. If you completed the quickstart, Airflow should already be running. Verify by opening [http://localhost:8080](http://localhost:8080) in your browser.
+1. If you completed the quickstart (or the VM bootstrap), Airflow services should be ready.
 
-2. If not running, start it:
+2. On the **Remote VM**, start the services:
+   ```bash
+   airflow webserver --port 8080 -D  # -D runs in background
+   airflow scheduler -D
+   ```
 
-```bash
-cd ~/airflow-demo
-source airflow_venv/bin/activate
-export AIRFLOW_HOME=~/airflow-demo/airflow_home
-airflow webserver --port 8080 &
-airflow scheduler &
-```
+3. Verify by opening [http://192.168.56.101:8080](http://192.168.56.101:8080) (or `localhost:8080` if local) in your browser.
 
-3. Install the dbt Cloud provider package (if not already installed):
-
-```bash
-pip install apache-airflow-providers-dbt-cloud
-```
+4. Install the dbt Cloud provider package (use constraints to prevent accidental Airflow 3.0 upgrades):
+   ```bash
+   PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
+   pip install "apache-airflow-providers-dbt-cloud" \
+     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-${PYTHON_VERSION}.txt"
+   ```
 
 ### Part B: Configure dbt Cloud Connection (10 min)
 
