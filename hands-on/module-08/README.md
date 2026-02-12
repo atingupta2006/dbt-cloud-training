@@ -13,8 +13,8 @@
 1. Open browser → [https://cloud.getdbt.com](https://cloud.getdbt.com)
 2. Create account or sign in
 3. Create a new project and connect your GitHub repository
-4. Navigate to **Account Settings → Projects → Your Project → Environments**
-5. Click **New Environment**
+4. Navigate to **Orchestration → Environments**
+5. Click **Create Environment** (or **+ Environment**)
 6. Configure:
 
 | Setting | Value |
@@ -30,7 +30,7 @@
 
 7. Enter your personal Snowflake user and password
 8. Click **Save**
-9. Open the Cloud IDE and run:
+9. Open the **Studio IDE** (click **Studio** in the left navigation) and run:
 
 ```bash
 dbt debug
@@ -46,8 +46,8 @@ Connection test should return `[OK]`.
 
 ### Steps
 
-1. Navigate to **Account Settings → Projects → Your Project → Environments**
-2. Click **New Environment**
+1. Navigate to **Orchestration → Environments**
+2. Click **Create Environment**
 3. Configure:
 
 | Setting | Value |

@@ -2,8 +2,6 @@
 
 **Duration:** 6 hours (Sessions 16–18)
 
-**Prerequisite:** Read [AIRFLOW-QUICKSTART.md](AIRFLOW-QUICKSTART.md) before starting Lab 4. It covers Airflow concepts (DAGs, operators, sensors, connections) from scratch — no prior Airflow experience required.
-
 ---
 
 ## Lab 1: Run Project in CLI and Cloud (25 min)
@@ -27,11 +25,11 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS_DEV.STG_CUSTOMERS;
 SELECT COUNT(*) FROM OLIST_DB.ANALYTICS_DEV.FCT_ORDERS;
 ```
 
-3. Open dbt Cloud → **Develop → Cloud IDE**
+3. Open dbt Cloud → click **Studio** in the left navigation (this opens the Studio IDE)
 
-4. Select Development environment
+4. Select your Development environment (check the bottom-right status button — it should show **Ready** in green)
 
-5. Run in the Cloud IDE command bar:
+5. Run in the Studio IDE command bar:
 
 ```
 dbt run
@@ -40,7 +38,14 @@ dbt test
 
 6. Verify the same models were created in the Cloud dev schema (Snowflake Web UI).
 
-Both CLI and Cloud produce identical results — the difference is where the execution happens.
+7. Compare both runs:
+   - **Execution time:** Note the duration shown in CLI output vs the Studio IDE command log
+   - **Logs:** CLI gives raw terminal output; Cloud gives a structured log viewer
+   - **UI experience:** CLI requires a terminal + separate Snowflake tab; Cloud bundles editor, runner, and results in one browser window
+
+8. Discuss trade-offs:
+   - **CLI:** More flexibility (scripting, automation, custom flags), works offline, faster iteration for experienced users
+   - **Cloud:** Better collaboration (shared project, version control UI), no local setup, built-in scheduling and artifacts
 
 ---
 
@@ -48,14 +53,14 @@ Both CLI and Cloud produce identical results — the difference is where the exe
 
 **Why:** Scheduled jobs ensure your warehouse is refreshed automatically. Without scheduling, someone has to manually run `dbt build` every day — that does not scale.
 
-### Pre-requisite: Sync your CLI changes to Git
+### Prerequisite: Sync your CLI changes to Git
 Before creating a job, ensure your dbt Cloud environment has the latest code:
 1. If you made changes on the **Remote VM** or locally, `commit` and `push` them to your Git repository (GitHub/GitLab).
-2. In dbt Cloud, ensured your **Environment** is pointed to the correct branch (e.g., `main`).
+2. In dbt Cloud, ensure your **Environment** is pointed to the correct branch (e.g., `main`).
 
 ### Steps
 
-1. In dbt Cloud, navigate to **Deploy → Jobs**
+1. In dbt Cloud, navigate to **Orchestration → Jobs**
 2. Click **Create Job**
 3. Configure:
 
@@ -63,7 +68,7 @@ Before creating a job, ensure your dbt Cloud environment has the latest code:
 |---------|-------|
 | Job Name | Daily Production Build |
 | Environment | Production |
-| Commands | `dbt run` and `dbt test` (each on its own line) |
+| Commands | `dbt build` |
 | Threads | 4 |
 
 4. Set schedule:
@@ -88,7 +93,7 @@ Before creating a job, ensure your dbt Cloud environment has the latest code:
 2. Click **Run Now**
 3. Watch the run progress:
    - **Logs** tab: real-time command output
-   - **Results** tab: model pass/fail summary
+   - **Results** tab: model pass/fail summary and execution times per model
 
 4. After completion, verify in Snowflake Web UI:
 
@@ -97,8 +102,10 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.STG_CUSTOMERS;
 SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
 ```
 
-5. In dbt Cloud, check **Run Details → Artifacts**:
-   - `run_results.json` — detailed results for each model
+5. Review run summary: total models built, tests passed/failed, overall duration.
+
+6. In dbt Cloud, check **Run Details → Artifacts**:
+   - `run_results.json` — detailed results for each model (status, timing, rows affected)
    - `manifest.json` — project metadata
 
 ---
@@ -111,21 +118,10 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
 
 ### Execution Mode: Remote VM vs Local (Choose one)
 
-This lab can be performed on your local machine if you have Airflow installed, OR on the provided **Remote CentOS VM**.
+This lab can be performed on your local machine (if you have Airflow installed) OR on the provided **Remote CentOS VM**.
 
-- **If using the Remote VM:**
-  - Connection details are in your `.env` file (`192.168.56.101`).
-  - You can use the `scripts/vm_manager.py` tool to check status:
-    ```bash
-    .venv/Scripts/python scripts/vm_manager.py status
-    ```
-  - SSH into the VM: `ssh root@192.168.56.101` (password: `osboxes.org`).
-  - Activate the Airflow environment:
-    ```bash
-    cd ~/airflow-demo
-    source airflow_venv/bin/activate
-    export AIRFLOW_HOME=~/airflow-demo/airflow_home
-    ```
+- **Remote VM:** SSH into `192.168.56.101` (password: `osboxes.org`), activate the Airflow venv, and set `AIRFLOW_HOME`.
+- **Local:** Use your local Airflow installation from the quickstart.
 
 ### Part A: Verify Airflow Is Running (10 min)
 
@@ -137,9 +133,9 @@ This lab can be performed on your local machine if you have Airflow installed, O
    airflow scheduler -D
    ```
 
-3. Verify by opening [http://192.168.56.101:8080](http://192.168.56.101:8080) (or `localhost:8080` if local) in your browser.
+3. Verify by opening `localhost:8080` in your browser.
 
-4. Install the dbt Cloud provider package (use constraints to prevent accidental Airflow 3.0 upgrades):
+4. Install the dbt Cloud provider package:
    ```bash
    PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
    pip install "apache-airflow-providers-dbt-cloud" \
@@ -149,7 +145,7 @@ This lab can be performed on your local machine if you have Airflow installed, O
 ### Part B: Configure dbt Cloud Connection (10 min)
 
 1. Get your dbt Cloud **Account ID**:
-   - In dbt Cloud, look at the URL: `https://cloud.getdbt.com/deploy/{ACCOUNT_ID}/...`
+   - In dbt Cloud, look at the URL: `https://cloud.getdbt.com/next/orchestration/{ACCOUNT_ID}/...`
    - Note this number
 
 2. Generate an API token:
@@ -158,7 +154,7 @@ This lab can be performed on your local machine if you have Airflow installed, O
    - Copy the token
 
 3. Get your **Job ID**:
-   - dbt Cloud → **Deploy → Jobs** → click on **Daily Production Build** (created in Lab 2)
+   - dbt Cloud → **Orchestration → Jobs** → click on **Daily Production Build** (created in Lab 2)
    - The Job ID is in the URL: `...jobs/{JOB_ID}`
 
 4. Add the connection in Airflow UI:
@@ -227,7 +223,7 @@ with DAG(
    - `Polling status every 30 seconds...`
    - `Job run completed with status: SUCCESS`
 
-5. Verify in dbt Cloud → **Deploy → Jobs → Daily Production Build → Run History**. You should see a new run triggered by the API (not by schedule).
+5. Verify in dbt Cloud → **Orchestration → Jobs → Daily Production Build → Run History**. You should see a new run triggered by the API (not by schedule).
 
 6. Verify the data in Snowflake Web UI:
 
@@ -237,6 +233,6 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
 
 ### Discussion
 
-- **When to use dbt Cloud scheduling vs Airflow:** Cloud scheduling is simpler. Airflow is for when dbt is one step in a larger pipeline (extract → transform → load → report).
+- **When to use dbt Cloud scheduling vs Airflow:** Cloud scheduling is simpler and sufficient when dbt is your only tool. Airflow is for when dbt is one step in a larger pipeline (extract → transform → load → report).
 - **What happens on failure?** Airflow retries based on `default_args.retries`. If all retries fail, the task shows red in the UI and sends an alert (if email is configured).
 - **Can Airflow run dbt CLI directly?** Yes — use `BashOperator` with `bash_command='dbt run --target prod'`. This is an alternative to the Cloud API approach.
