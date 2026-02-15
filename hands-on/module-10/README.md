@@ -33,7 +33,7 @@ Compilation Error in model stg_broken_ref
   node 'stg_customer' was not found
 ```
 
-4. Fix: change `stg_customer` → `stg_customers`. Re-compile to confirm.
+4. Fix: Open `models/staging/stg_broken_ref.sql` and change `stg_customer` to `stg_customers`. Re-compile to confirm.
 
 5. Clean up:
 
@@ -69,7 +69,7 @@ Compilation Error
   unexpected end of template, expected 'end of print statement'
 ```
 
-4. Fix: change `%` → `%}` on the `if` line. Re-compile.
+4. Fix: Open `models/staging/stg_broken_jinja.sql`, locate line 6, and change `%` to `%}`. Re-compile to confirm.
 
 5. Clean up:
 
@@ -134,7 +134,7 @@ UNION ALL
 SELECT * FROM {{ ref('stg_customers') }} LIMIT 1
 ```
 
-3. Add a test in `models/staging/schema.yml`:
+3. Add a test in `models/staging/schema.yml`. Append this to the existing `models:` list (watch your indentation):
 
 ```yaml
   - name: stg_customers_bad
@@ -165,7 +165,7 @@ cat target/compiled/olist_dbt_project/models/staging/schema.yml/unique_stg_custo
 rm models/staging/stg_customers_bad.sql
 ```
 
-Remove the test entry from `schema.yml`.
+Remove the entire `stg_customers_bad` block from `models/staging/schema.yml`.
 
 ### Scenario B: Negative Amounts
 
@@ -213,7 +213,7 @@ rm models/marts/fct_orders_check.sql tests/assert_no_negative_net_amount.sql
 
 ### Steps
 
-1. Create a deliberately expensive model:
+1. Create a deliberately expensive model (`models/marts/fct_sales_slow.sql`):
 
 ```sql
 -- models/marts/fct_sales_slow.sql
@@ -336,10 +336,10 @@ dbt debug
 
 This validates: Python version, profiles.yml, database connectivity, required schemas.
 
-5. Simulate a selective re-run after failure. If `fct_orders` failed:
+5. Simulate a selective re-run. Imagine `fct_orders` failed in a nightly job. Instead of running everything, use selection syntax to rebuild just that model and its downstream dependencies:
 
 ```bash
-dbt run --select fct_orders
+dbt run --select fct_orders+
 ```
 
 6. In dbt Cloud, the equivalent is: **Deploy → Jobs → Run History** → select failed run → examine **Logs** tab → click on the failed model for error details.

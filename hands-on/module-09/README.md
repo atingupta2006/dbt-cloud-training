@@ -112,73 +112,97 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
 
 ## Lab 4: Trigger dbt Cloud Job from Airflow (45 min)
 
-**Why:** In enterprise environments, dbt is one piece of a larger data pipeline. Airflow orchestrates ingestion, dbt transformation, and downstream reporting in sequence — no manual steps, full observability.
+**Why:** In mature data platforms, dbt is rarely an island. It depends on upstream loaders (Fivetran/Airbyte) and feeds downstream dashboards (Tableau/Looker). An orchestrator like **Airflow** manages these dependencies, ensuring dbt runs only *after* raw data arrives.
 
-**Prerequisite:** You must have read [AIRFLOW-QUICKSTART.md](AIRFLOW-QUICKSTART.md) before this lab. It covers installation, core concepts, and operator basics.
+**Concepts:**
+- **DAG (Directed Acyclic Graph):** A workflow defined in Python.
+- **Operator:** A task template (e.g., `BashOperator` runs scripts, `DbtCloudRunJobOperator` talks to dbt Cloud API).
+- **Connection:** Securely stores API tokens and credentials, keeping them out of your code.
 
-### Execution Mode: Remote VM vs Local (Choose one)
+### Prerequisite: Airflow Environment
+This lab uses the **Remote VM** where Airflow 2.9.3 is pre-installed in `~/airflow-demo`.
 
-This lab can be performed on your local machine (if you have Airflow installed) OR on the provided **Remote CentOS VM**.
+### Part A: Start Airflow Services (10 min)
 
-- **Remote VM:** SSH into `192.168.56.101` (password: `osboxes.org`), activate the Airflow venv, and set `AIRFLOW_HOME`.
-- **Local:** Use your local Airflow installation from the quickstart.
+1. Connect to the Remote VM via SSH.
 
-### Part A: Verify Airflow Is Running (10 min)
+2. Activate the Airflow environment and start services:
 
-1. If you completed the quickstart (or the VM bootstrap), Airflow services should be ready.
+```bash
+# Terminal 1: Start Scheduler
+source ~/airflow-demo/airflow_venv/bin/activate
+export AIRFLOW_HOME=~/airflow-demo/airflow_home
+airflow scheduler
+```
 
-2. On the **Remote VM**, start the services:
-   ```bash
-   airflow webserver --port 8080 -D  # -D runs in background
-   airflow scheduler -D
-   ```
+3. Open a **new terminal** to the VM and start the Webserver:
 
-3. Verify by opening `localhost:8080` in your browser.
+```bash
+# Terminal 2: Start Webserver
+source ~/airflow-demo/airflow_venv/bin/activate
+export AIRFLOW_HOME=~/airflow-demo/airflow_home
+airflow webserver --port 8080
+```
 
-4. Install the dbt Cloud provider package:
-   ```bash
-   PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
-   pip install "apache-airflow-providers-dbt-cloud" \
-     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-${PYTHON_VERSION}.txt"
-   ```
+4. Open your browser to `http://<VM_IP>:8080`.
+   - **Username:** `admin`
+   - **Password:** `admin`
 
-### Part B: Configure dbt Cloud Connection (10 min)
+### Part B: Install dbt Cloud Provider (5 min)
 
-1. Get your dbt Cloud **Account ID**:
-   - In dbt Cloud, look at the URL: `https://cloud.getdbt.com/next/orchestration/{ACCOUNT_ID}/...`
-   - Note this number
+The `apache-airflow-providers-dbt-cloud` package allows Airflow to communicate with dbt Cloud's API.
 
-2. Generate an API token:
-   - dbt Cloud → profile icon → **Account Settings → API Access → Service Tokens**
-   - Click **+ New Token** → Name: `airflow-training` → Permissions: **Job Admin**
-   - Copy the token
+1. In a **new terminal** (or stop the scheduler with Ctrl+C), run:
 
-3. Get your **Job ID**:
-   - dbt Cloud → **Orchestration → Jobs** → click on **Daily Production Build** (created in Lab 2)
-   - The Job ID is in the URL: `...jobs/{JOB_ID}`
+```bash
+source ~/airflow-demo/airflow_venv/bin/activate
+pip install "apache-airflow-providers-dbt-cloud" \
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.9.txt"
+```
 
-4. Add the connection in Airflow UI:
-   - Navigate to **Admin → Connections** → click **+**
-   - Configure:
+> **Note:** If you stopped the scheduler, restart it now (`airflow scheduler`).
 
-| Field | Value |
-|-------|-------|
-| Connection Id | `dbt_cloud_default` |
-| Connection Type | `dbt Cloud` |
-| Account ID | Your Account ID from step 1 |
-| API Token | The token from step 2 |
+### Part C: Configure dbt Cloud Connection (10 min)
 
-5. Click **Save**
+Airflow needs your dbt Cloud API token to trigger jobs.
 
-### Part C: Create the DAG (15 min)
+1. **Get Account ID:**
+   - URL: `https://cloud.getdbt.com/next/orchestration/12345/...` -> Account ID is `12345`.
 
-1. Create `$AIRFLOW_HOME/dags/dbt_cloud_pipeline.py` in VSCode:
+2. **Get API Token:**
+   - In dbt Cloud: **Profile Icon** → **Account Settings** → **API Access**.
+   - Create New Token: Name `airflow-lab`, Permissions `Job Admin`. Copy the token.
+
+3. **Get Job ID:**
+   - In dbt Cloud: **Deploy** → **Jobs** → Select "Daily Production Build".
+   - URL: `.../jobs/98765` -> Job ID is `98765`.
+
+4. **Add Connection in Airflow:**
+   - Go to **Admin** → **Connections** → **+ (Add)**
+   - **Connection Id:** `dbt_cloud_default` (Recommended default name)
+   - **Connection Type:** `dbt Cloud`
+   - **Account ID:** `<Your Account ID>`
+   - **API Token:** `<Your API Token>`
+   - Click **Save**.
+
+### Part D: Create the DAG (15 min)
+
+We'll define a DAG that runs daily and triggers your dbt Cloud job.
+
+1. Create the DAG file in the Airflow DAGs folder:
+
+```bash
+nano ~/airflow-demo/airflow_home/dags/dbt_cloud_pipeline.py
+```
+
+2. Paste the following code (replace `job_id` with yours):
 
 ```python
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.dbt.cloud.operators.dbt import DbtCloudRunJobOperator
 
+# Default arguments for all tasks in the DAG
 default_args = {
     'owner': 'data-team',
     'retries': 1,
@@ -190,49 +214,46 @@ with DAG(
     description='Trigger dbt Cloud production job',
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=None,              # Manual trigger only (no auto-schedule)
+    schedule=None,              # Manual trigger (no cron schedule)
     catchup=False,
     tags=['dbt', 'training'],
 ) as dag:
 
     trigger_dbt_job = DbtCloudRunJobOperator(
         task_id='trigger_dbt_build',
-        dbt_cloud_conn_id='dbt_cloud_default',
-        job_id=12345,           # Replace with YOUR Job ID from Part B step 3
-        check_interval=30,      # Poll dbt Cloud every 30 seconds
-        timeout=3600,           # Fail if job takes longer than 1 hour
+        dbt_cloud_conn_id='dbt_cloud_default', # Matches Connection ID from Part C
+        job_id=12345,           # <--- REPLACE WITH YOUR JOB ID
+        check_interval=30,      # Poll dbt Cloud status every 30s
+        timeout=3600,           # Fail if job takes > 1 hour
+        wait_for_termination=True # Wait for job to finish before marking task success
     )
 ```
 
-> Replace `job_id=12345` with the actual Job ID you noted in Part B.
+3. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
 
-2. Wait 30 seconds for the scheduler to detect the new DAG file.
+4. Wait 30 seconds for Airflow to parse the file. Refresh the DAGs list in the UI.
 
-3. Refresh the Airflow UI. You should see **dbt_cloud_pipeline** in the DAG list.
+### Part E: Trigger and Monitor (5 min)
 
-### Part D: Trigger and Monitor (10 min)
+1. Toggle the **dbt_cloud_pipeline** DAG to **Unpause** (slide the toggle to blue).
 
-1. Toggle the DAG **ON** (switch on the left of `dbt_cloud_pipeline`)
+2. Click the **Play Button** (▶) → **Trigger DAG**.
 
-2. Click the **play button** (▶) → **Trigger DAG**
+3. Click the DAG name → **Grid View** (or Graph View).
+   - A green square indicates success.
+   - A spinning circle is running.
 
-3. Click on the DAG name → **Graph** view. You see one task: `trigger_dbt_build`.
+4. **Verify in dbt Cloud:**
+   - Go to **Deploy** → **Jobs** → **Daily Production Build**.
+   - You should see a "Running" job triggered by "API".
 
-4. Click on the task → **Logs**. You should see:
-   - `Triggering job run for job_id=...`
-   - `Polling status every 30 seconds...`
-   - `Job run completed with status: SUCCESS`
-
-5. Verify in dbt Cloud → **Orchestration → Jobs → Daily Production Build → Run History**. You should see a new run triggered by the API (not by schedule).
-
-6. Verify the data in Snowflake Web UI:
-
-```sql
-SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
-```
+5. **Verify in Snowflake:**
+   - Check the `LAST_ALTERED` timestamp of your tables.
 
 ### Discussion
 
-- **When to use dbt Cloud scheduling vs Airflow:** Cloud scheduling is simpler and sufficient when dbt is your only tool. Airflow is for when dbt is one step in a larger pipeline (extract → transform → load → report).
-- **What happens on failure?** Airflow retries based on `default_args.retries`. If all retries fail, the task shows red in the UI and sends an alert (if email is configured).
-- **Can Airflow run dbt CLI directly?** Yes — use `BashOperator` with `bash_command='dbt run --target prod'`. This is an alternative to the Cloud API approach.
+1.  **Why use `wait_for_termination=True`?**
+    - If `False`, Airflow just "fires and forgets" — marking the task successful as soon as dbt Cloud receives the request.
+    - If `True` (default), Airflow keeps the task running until dbt Cloud finishes. This is crucial if downstream tasks (e.g., "Refresh Tableau") depend on dbt success.
+
+2.  **Handling Secrets:** Note how the API Token is *never* in the Python code. It's stored securely in the Airflow metadata database via the Connection.
