@@ -120,7 +120,7 @@ SELECT COUNT(*) FROM OLIST_DB.ANALYTICS.FCT_ORDERS;
 - **Connection:** Securely stores API tokens and credentials, keeping them out of your code.
 
 ### Prerequisite: Airflow Environment
-This lab uses the **Remote VM** where Airflow 2.9.3 is pre-installed in `~/airflow-demo`.
+This lab uses the **Remote VM** where Airflow 2.9.3 is pre-installed in `~/airflow-lab`.
 
 ### Part A: Start Airflow Services (10 min)
 
@@ -130,8 +130,8 @@ This lab uses the **Remote VM** where Airflow 2.9.3 is pre-installed in `~/airfl
 
 ```bash
 # Terminal 1: Start Scheduler
-source ~/airflow-demo/airflow_venv/bin/activate
-export AIRFLOW_HOME=~/airflow-demo/airflow_home
+source ~/airflow-lab/venv/bin/activate
+export AIRFLOW_HOME=~/airflow-lab/airflow_home
 airflow scheduler
 ```
 
@@ -139,8 +139,8 @@ airflow scheduler
 
 ```bash
 # Terminal 2: Start Webserver
-source ~/airflow-demo/airflow_venv/bin/activate
-export AIRFLOW_HOME=~/airflow-demo/airflow_home
+source ~/airflow-lab/venv/bin/activate
+export AIRFLOW_HOME=~/airflow-lab/airflow_home
 airflow webserver --port 8080
 ```
 
@@ -155,7 +155,7 @@ The `apache-airflow-providers-dbt-cloud` package allows Airflow to communicate w
 1. In a **new terminal** (or stop the scheduler with Ctrl+C), run:
 
 ```bash
-source ~/airflow-demo/airflow_venv/bin/activate
+source ~/airflow-lab/venv/bin/activate
 pip install "apache-airflow-providers-dbt-cloud" \
   --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.9.txt"
 ```
@@ -192,7 +192,7 @@ We'll define a DAG that runs daily and triggers your dbt Cloud job.
 1. Create the DAG file in the Airflow DAGs folder:
 
 ```bash
-nano ~/airflow-demo/airflow_home/dags/dbt_cloud_pipeline.py
+nano ~/airflow-lab/airflow_home/dags/dbt_cloud_pipeline.py
 ```
 
 2. Paste the following code (replace `job_id` with yours):
