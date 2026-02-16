@@ -437,4 +437,5 @@ FodyWeavers.xsd
 # JetBrains Rider
 .idea/
 *.sln.iml
-site/*
+site/*\n# Internal files\nALIGNMENT-STATUS.md\nREVIEW-PROMPT-*.md\nREVIEW-REPORT*.md\nagentic-labs-progress-report/\nprompts/\ncommands.sh\ngithub.bat\nlisting.txt\nscripts/\nreferences/\ninstructor-prep/
+\n .gitignore-*
