@@ -438,15 +438,3 @@ FodyWeavers.xsd
 .idea/
 *.sln.iml
 site/*
-# Internal files
-ALIGNMENT-STATUS.md
-REVIEW-PROMPT-*.md
-REVIEW-REPORT*.md
-agentic-labs-progress-report/
-prompts/
-commands.sh
-github.bat
-listing.txt
-scripts/
-references/
-instructor-prep/
