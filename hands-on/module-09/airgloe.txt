@@ -1,0 +1,33 @@
+# Get Python version (e.g., 3.9, 3.11)
+PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
+
+# Install Airflow
+pip install "apache-airflow==2.9.3" \
+ --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-${PYTHON_VERSION}.txt"
+Step 3: Initialize Airflow
+Set the home directory and initialize the database (SQLite by default).
+
+export AIRFLOW_HOME=~/airflow-lab/airflow_home
+airflow db migrate
+Step 4: Create Admin User
+airflow users create \
+    --username admin \
+    --firstname Peter \
+    --lastname Parker \
+    --role Admin \
+    --email spiderman@superhero.org \
+    --password admin
+Step 5: Start Services
+You need two terminals (or run in background with -D).
+
+Terminal 1 (Scheduler):
+
+source ~/airflow-lab/venv/bin/activate
+export AIRFLOW_HOME=~/airflow-lab/airflow_home
+airflow scheduler
+Terminal 2 (Webserver):
+
+source ~/airflow-lab/venv/bin/activate
+export AIRFLOW_HOME=~/airflow-lab/airflow_home
+airflow webserver --port 8080
+Access the UI at http://localhost:8080.
