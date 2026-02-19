@@ -438,3 +438,14 @@ FodyWeavers.xsd
 .idea/
 *.sln.iml
 site/*
+**/listing.tst
+**/REVIEW-REPORT.md
+**/REVIEW-REPORT-2.md
+**/REVIEW-PROMPT-FOR-GEMINI.md
+**/REVIEW-PROMPT-3-FOR-GEMINI.md
+**/*prompt*
+**/*PROMPT*
+**/*ALIGNMENT*
+**/agentic-labs-progress-report
+**/REPORT-2026-02-11.md
+**/*REPORT*
